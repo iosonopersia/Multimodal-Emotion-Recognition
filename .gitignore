@@ -1,3 +1,7 @@
+# Our virtual environments
+.MER_env
+.MER_env_linux
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
