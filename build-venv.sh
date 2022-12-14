@@ -1,5 +1,5 @@
 #!/bin/bash
-VENV_PATH=.env_linux
+VENV_PATH=.MER_env_linux
 
 echo "Python version: $(python3 --version)"
 echo "Initializing virtual environment in $VENV_PATH ..."
