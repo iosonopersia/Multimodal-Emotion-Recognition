@@ -1,3 +1,6 @@
+# The data directory
+data/
+
 # Our virtual environments
 .MER_env
 .MER_env_linux
