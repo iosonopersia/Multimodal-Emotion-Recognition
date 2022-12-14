@@ -1,0 +1,46 @@
+---
+
+checkpoint:
+    path: checkpoints/model.pth
+    save_checkpoint: True
+    load_checkpoint: False
+
+solver:
+    loss_fn: MSE
+    lr: 1.0e-3
+    epochs: 1000
+    scheduler:
+        enabled: False
+        scheduler_fn: ExponentialLR
+        gamma: 0.98
+
+train:
+    data_loader:
+        shuffle: True
+        batch_size: 32
+        num_workers: 2
+        pin_memory: True
+    early_stopping:
+        enabled: True
+        patience: 10
+        restore_best_weights: True
+
+val:
+    data_loader:
+        shuffle: False
+        batch_size: 32
+        num_workers: 2
+        pin_memory: True
+
+test:
+    data_loader:
+        shuffle: False
+        batch_size: 32
+        num_workers: 2
+        pin_memory: True
+
+wandb:
+    enabled: True
+    project_name: multimodal-emotion-recognition
+
+...
