@@ -27,8 +27,9 @@ def convert_videos(mp4_path):
         wav_filename = os.path.basename(mp4).replace("mp4", "wav")
         output_file = os.path.join(wav_path, wav_filename)
 
-        with open(".stdout", "w") as f, open(".stderr", "w") as g:
-            retcode = subprocess.call([args.ffmpeg_path, "-y", "-f", "mp4", "-i", mp4, "-codec", "copy", "-f", "wav", output_file], stdout=f, stderr=g)
+        #                                  -ab  192       -ar 16000
+        command = f"ffmpeg -f mp4 -i {mp4} -ab 160k -ac 2 -ar 44100 -vn -f wav {output_file} > .stdout 2> .stderr"
+        retcode = subprocess.call(command, shell=True)
 
         if retcode != 0:
             with open(".stderr", "r") as f:
@@ -41,9 +42,9 @@ def convert_videos(mp4_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--ffmpeg_path", type=str, default="C://ffmpeg/bin/ffmpeg.exe")
-    parser.add_argument("-a", "--train_path", type=str, default="C://MELD/train_splits")
-    parser.add_argument("-b", "--dev_path", type=str, default="C://MELD/dev_splits_complete")
-    parser.add_argument("-c", "--test_path", type=str, default="C://MELD/output_repeated_splits_test")
+    parser.add_argument("-a", "--train_path", type=str, default="data/MELD.raw/train_splits")
+    parser.add_argument("-b", "--dev_path", type=str, default="data/MELD.raw/dev_splits_complete")
+    parser.add_argument("-c", "--test_path", type=str, default="data/MELD.raw/output_repeated_splits_test")
     args = parser.parse_args()
 
     logging.basicConfig(filename="mp4towav_log.txt", filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
