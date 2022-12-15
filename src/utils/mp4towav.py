@@ -6,6 +6,8 @@ import logging
 
 
 def convert_videos(mp4_path):
+    mp4_path = os.path.abspath(mp4_path) # Get absolute path
+
     # Create wav folder if it doesn't exist
     wav_path = os.path.join(mp4_path, "wav")
     if not os.path.exists(wav_path):
@@ -22,10 +24,9 @@ def convert_videos(mp4_path):
     print("s"if len(mp4s)>1 else "", end="")
     print(f" in {mp4_path} still to be converted...")
 
-    mp4s = {os.path.join(mp4_path, mp4) for mp4 in mp4s}
     for mp4 in tqdm(mp4s):
-        wav_filename = os.path.basename(mp4).replace("mp4", "wav")
-        output_file = os.path.join(wav_path, wav_filename)
+        wav_file = mp4.replace(".mp4", ".wav")
+        output_file = os.path.join(wav_path, wav_file)
 
         #                                  -ab  192       -ar 16000
         command = f"ffmpeg -f mp4 -i {mp4} -ab 160k -ac 2 -ar 44100 -vn -f wav {output_file} > .stdout 2> .stderr"
