@@ -8,4 +8,4 @@ python3 -m venv $VENV_PATH
 
 $VENV_PATH/bin/python -m pip install -U pip
 $VENV_PATH/bin/pip install -U wheel setuptools
-$VENV_PATH/bin/pip install -r ./requirements.txt
+$VENV_PATH/bin/pip install -r ./requirements_linux.txt
