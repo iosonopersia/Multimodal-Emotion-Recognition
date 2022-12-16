@@ -7,7 +7,6 @@ import pandas as pd
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, mode="train"):
         self.mode = mode
-        self.bundle = torchaudio.pipelines.WAV2VEC2_BASE
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
         if self.mode == "val":
@@ -38,7 +37,6 @@ class Dataset(torch.utils.data.Dataset):
         # Audio
         wav_path = os.path.join(self.audio_path, f"dia{dial_id}_utt{utt_id}.wav")
         audio, sr = torchaudio.load(wav_path, format="wav")
-        audio = torchaudio.functional.resample(audio, sr, self.bundle.sample_rate)
 
         # Text
         text = self.text.iloc[idx]["Utterance"]
