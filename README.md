@@ -8,10 +8,10 @@ This project was developed in `Python3` and `pytorch`. Run the following command
 
 ```bash
 # Linux
-pip install -r ./requirements_linux.txt
+pip install --no-cache -r ./requirements_linux.txt
 
 # Windows
-pip install -r ./requirements.txt
+pip install --no-cache -r ./requirements.txt
 ```
 
 Otherwise, you can build a ready-to-go virtual environment by running the following scripts from the project's folder:
@@ -21,7 +21,7 @@ Otherwise, you can build a ready-to-go virtual environment by running the follow
 > ./scripts/build_venv.sh
 
 # Windows
-> scripts/build_venv.bat
+> .\scripts\build_venv.bat
 ```
 
 ### Download FFMPEG
@@ -34,12 +34,12 @@ Now, you need to download and prepare the dataset. Run the following commands fr
 
 ```bash
 # Linux
-> ./scripts/MLED_download. # Download dataset
+> ./scripts/MELD_download. # Download dataset
 > ./scripts/video2wav.sh # Extract audio
 
 # Windows
-> scripts/MLED_download.bat # Download dataset
-> scripts/video2wav.bat # Extract audio
+> .\scripts\MELD_download.bat # Download dataset
+> .\scripts\video2wav.bat # Extract audio
 ```
 
 ## Group members
