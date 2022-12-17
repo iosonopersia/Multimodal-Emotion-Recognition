@@ -1,5 +1,6 @@
 mkdir data
-cd data
+pushd data
+
 wget https://huggingface.co/datasets/declare-lab/MELD/resolve/main/MELD.Raw.tar.gz
 tar -xvf MELD.Raw.tar.gz
 rm MELD.Raw.tar.gz
@@ -13,4 +14,4 @@ rm dev.tar.gz
 rm test.tar.gz
 rm train.tar.gz
 
-cd..
+popd
