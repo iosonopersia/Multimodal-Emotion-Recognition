@@ -18,10 +18,10 @@ Otherwise, you can build a ready-to-go virtual environment by running the follow
 
 ```bash
 # Linux
-> ./scripts/build_venv.sh
+> ./scripts/build-venv.sh
 
 # Windows
-> .\scripts\build_venv.bat
+> .\scripts\build-venv.bat
 ```
 
 ### Download FFMPEG
