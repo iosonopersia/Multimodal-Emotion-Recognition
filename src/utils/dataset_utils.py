@@ -17,7 +17,8 @@ def get_text (mode="train"):
     if not os.path.exists(data_path):
         raise ValueError("Dataset not found at {}".format(data_path))
 
-    df = pd.read_csv(data_path)
+    df = pd.read_csv(data_path, usecols=['Sr No.', 'Utterance', 'Emotion', 'Sentiment', 'Dialogue_ID', 'Utterance_ID'], encoding="utf-8")
+    df["Utterance"] = df["Utterance"].map(lambda x: x.replace("\u0092", "'"))
 
     return df
 
