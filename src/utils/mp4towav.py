@@ -26,10 +26,11 @@ def convert_videos(mp4_path):
 
     for mp4 in tqdm(mp4s):
         wav_file = mp4.replace(".mp4", ".wav")
+        input_file = os.path.join(mp4_path, mp4)
         output_file = os.path.join(wav_path, wav_file)
 
         #                                  -ab  192       -ar 16000
-        command = f"ffmpeg -f mp4 -i {mp4} -ab 160k -ac 2 -ar 44100 -vn -f wav {output_file} > .stdout 2> .stderr"
+        command = f"ffmpeg -f mp4 -i \"{input_file}\" -ab 160k -ac 2 -ar 44100 -vn -f wav \"{output_file}\" > .stdout 2> .stderr"
         retcode = subprocess.call(command, shell=True)
 
         if retcode != 0:
