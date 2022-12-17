@@ -1,4 +1,4 @@
-# Multimodal Emotion Recognition
+<h1 align='center'> Multimodal Emotion Recognition </h1>
 
 This repository contains a project realized as part of the _Natural Language Processing_ exam of the [Master's degree in Artificial Intelligence, University of Bologna](https://corsi.unibo.it/2cycle/artificial-intelligence).
 
@@ -7,6 +7,10 @@ This repository contains a project realized as part of the _Natural Language Pro
 This project was developed in `Python3` and `pytorch`. Run the following command to install the prerequisites:
 
 ```bash
+# Linux
+pip install -r ./requirements_linux.txt
+
+# Windows
 pip install -r ./requirements.txt
 ```
 
@@ -14,10 +18,28 @@ Otherwise, you can build a ready-to-go virtual environment by running the follow
 
 ```bash
 # Linux
-> ./build_venv.sh
+> ./scripts/build_venv.sh
 
 # Windows
-> build_venv.bat
+> scripts/build_venv.bat
+```
+
+### Download FFMPEG
+
+Download `ffmpeg` from [here](https://ffmpeg.org/download.html). Follow online tutorials to install it correctly based on your OS.
+
+### Download dataset
+
+Now, you need to download and prepare the dataset. Run the following commands from the project's folder:
+
+```bash
+# Linux
+> ./scripts/MLED_download. # Download dataset
+> ./scripts/video2wav.sh # Extract audio
+
+# Windows
+> scripts/MLED_download.bat # Download dataset
+> scripts/video2wav.bat # Extract audio
 ```
 
 ## Group members
