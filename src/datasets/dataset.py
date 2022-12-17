@@ -1,5 +1,5 @@
 import torch
-from ..utils.dataset_utils import get_text
+from utils.dataset_utils import get_text
 import os
 import torchaudio
 import pandas as pd
@@ -15,40 +15,56 @@ class Dataset(torch.utils.data.Dataset):
             self.audio_path = "data/MELD.Raw/output_repeated_splits_test/wav"
 
         self.text = get_text(mode)
-        self.text.drop(columns=["Speaker", "Episode", "StartTime", "EndTime"], inplace=True)
         self.sentiment_labels = self.text["Sentiment"]
         self.emotion_labels = self.text["Emotion"]
 
         # labels to one-hot encoding
-        self.sentiment_labels_h = torch.nn.functional.one_hot(torch.tensor(pd.Categorical(self.sentiment_labels).codes, dtype=torch.int64), num_classes=3)
-        self.emotion_labels_h = torch.nn.functional.one_hot(torch.tensor(pd.Categorical(self.emotion_labels).codes, dtype=torch.int64), num_classes=7)
+        sentiment_labels = ["neutral", "negative", "positive"]
+        num_sentiments = len(sentiment_labels)
+        sent_oneh = torch.nn.functional.one_hot(torch.arange(0, num_sentiments, dtype=torch.int64), num_classes=num_sentiments)
+        self.sentiment2oneh = {sent: sent_oneh for sent, sent_oneh in zip(sentiment_labels, sent_oneh)}
 
-        self.oneh2sentiment = {h:sent for h, sent in zip(self.sentiment_labels_h, self.sentiment_labels)}
-        self.oneh2emotion = {h:emo for h, emo in zip(self.emotion_labels_h, self.emotion_labels)}
+        emotion_labels = ["neutral", "joy", "sadness", "anger", "surprise", "fear", "disgust"]
+        num_emotions = len(emotion_labels)
+        emo_oneh = torch.nn.functional.one_hot(torch.arange(0, num_emotions, dtype=torch.int64), num_classes=num_emotions)
+        self.emotion2oneh = {emo: emo_oneh for emo, emo_oneh in zip(emotion_labels, emo_oneh)}
 
+        # Inversed dictionaries
+        self.oneh2sentiment = {h: sent for h, sent in self.sentiment2oneh.items()}
+        self.oneh2emotion = {h: emo for h, emo in self.emotion2oneh.items()}
 
     def __len__(self):
         return len(self.text)
 
     def __getitem__(self, idx):
-        utt_id = self.text.iloc[idx]["Utterance_ID"]
-        dial_id = self.text.iloc[idx]["Dialogue_ID"]
+        utterances = self.text[self.text["Dialogue_ID"] == idx].sort_values(by="Utterance_ID")
 
-        # Audio
-        wav_path = os.path.join(self.audio_path, f"dia{dial_id}_utt{utt_id}.wav")
-        audio, sr = torchaudio.load(wav_path, format="wav")
+        dialogue_id = idx
+        text = []
+        audio = []
+        sr = []
+        sentiment = []
+        emotion = []
+        for _, utterance in utterances.iterrows():
+            utterance_id = utterance["Utterance_ID"]
 
-        # Text
-        text = self.text.iloc[idx]["Utterance"]
+            # Audio
+            _wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{dialogue_id}_utt{utterance_id}.wav")
+            _audio, _sr = torchaudio.load(_wav_path, format="wav")
 
+            # Text
+            _text = utterance["Utterance"]
 
-        return {"text":text, "audio":audio, "sample_rate":sr, "sentiment":self.sentiment_labels_h[idx], "emotion":self.emotion_labels_h[idx]}
+            # Sentiment
+            _sentiment = utterance["Sentiment"]
 
-if __name__ == "__main__":
-    # Test Dataset class
-    dataset = Dataset()
-    data_ld = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
-    for i, data in enumerate(data_ld):
-        print(data)
-        break
-    print(dataset[0])
+            # Emotion
+            _emotion = utterance["Emotion"]
+
+            audio.append(_audio)
+            sr.append(_sr)
+            text.append(_text)
+            sentiment.append(self.sentiment2oneh[_sentiment])
+            emotion.append(self.emotion2oneh[_emotion])
+
+        return {"text": text, "audio": audio, "sample_rate": sr, "sentiment": sentiment, "emotion": emotion}
