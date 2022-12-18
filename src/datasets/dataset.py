@@ -1,11 +1,24 @@
 import torch
+from models.FeatureExtractor import FeatureExtractor
+from utils import get_config, apply_padding
 from utils.dataset_utils import get_text
 import os
 import torchaudio
-import pandas as pd
+from transformers import RobertaTokenizer
+
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, mode="train"):
+        super().__init__()
+
+        config = get_config()
+        self.ffmpeg_sr = config.AUDIO.ffmpeg_sr
+        self.wav2vec_sr = config.AUDIO.wav2vec_sr
+
+        self.roberta_encoder = RobertaTokenizer.from_pretrained('roberta-base')
+
+        self.feature_embedding_model = FeatureExtractor(torch.device("cuda:0"))
+
         self.mode = mode
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
@@ -33,24 +46,31 @@ class Dataset(torch.utils.data.Dataset):
         self.oneh2sentiment = {h: sent for h, sent in self.sentiment2oneh.items()}
         self.oneh2emotion = {h: emo for h, emo in self.emotion2oneh.items()}
 
+        self.dialogue_ids = self.text["Dialogue_ID"].unique()
+        print(f"Loaded {len(self.dialogue_ids)} dialogues for {self.mode}ing")
+
     def __len__(self):
-        return len(self.text)
+        return len(self.dialogue_ids)
 
     def __getitem__(self, idx):
-        utterances = self.text[self.text["Dialogue_ID"] == idx].sort_values(by="Utterance_ID")
+        dialogue_id = self.dialogue_ids[idx]
 
-        dialogue_id = idx
+        utterances = self.text[self.text["Dialogue_ID"] == dialogue_id].sort_values(by="Utterance_ID")
+
         text = []
         audio = []
-        sr = []
         sentiment = []
         emotion = []
         for _, utterance in utterances.iterrows():
             utterance_id = utterance["Utterance_ID"]
 
+            if dialogue_id == 125 and utterance_id == 3:
+                # This utterance video/audio is corrupted :-(
+                continue
+
             # Audio
             _wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{dialogue_id}_utt{utterance_id}.wav")
-            _audio, _sr = torchaudio.load(_wav_path, format="wav")
+            _audio, _ = torchaudio.load(_wav_path, format="wav")
 
             # Text
             _text = utterance["Utterance"]
@@ -62,9 +82,34 @@ class Dataset(torch.utils.data.Dataset):
             _emotion = utterance["Emotion"]
 
             audio.append(_audio)
-            sr.append(_sr)
             text.append(_text)
             sentiment.append(self.sentiment2oneh[_sentiment])
             emotion.append(self.emotion2oneh[_emotion])
 
-        return {"text": text, "audio": audio, "sample_rate": sr, "sentiment": sentiment, "emotion": emotion}
+        # Tokenize text
+        text = self.roberta_encoder(text, return_tensors="pt", padding="longest")
+
+        # Resample to 16kHz for wav2vec2
+        if self.wav2vec_sr != self.ffmpeg_sr:
+            audio = [torchaudio.functional.resample(a, self.ffmpeg_sr, self.wav2vec_sr) for a in audio]
+
+        return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
+
+    def my_collate_fn(self, batch):
+        # text
+        text = [d["text"] for d in batch]
+
+        # audio
+        audio = [d["audio"] for d in batch]
+
+        # sentiment
+        sentiment = [torch.stack(d["sentiment"], dim=0).unsqueeze(dim=0) for d in batch]
+        sentiment, _ = apply_padding(sentiment)
+
+        # emotion
+        emotion = [torch.stack(d["emotion"], dim=0).unsqueeze(dim=0) for d in batch]
+        emotion, _ = apply_padding(emotion)
+
+        text, audio = self.feature_embedding_model(text, audio)
+
+        return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
