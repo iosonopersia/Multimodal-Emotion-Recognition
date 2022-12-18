@@ -29,8 +29,7 @@ def convert_videos(mp4_path):
         input_file = os.path.join(mp4_path, mp4)
         output_file = os.path.join(wav_path, wav_file)
 
-        #                                  -ab  192       -ar 16000
-        command = f"ffmpeg -f mp4 -i \"{input_file}\" -ab 160k -ac 2 -ar 44100 -vn -f wav \"{output_file}\" > .stdout 2> .stderr"
+        command = f"ffmpeg -y -f mp4 -i \"{input_file}\" -ac 1 -ar 16000 -vn -f wav \"{output_file}\" > .stdout 2> .stderr"
         retcode = subprocess.call(command, shell=True)
 
         if retcode != 0:
