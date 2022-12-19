@@ -2,6 +2,7 @@
 mp4towaw_log.txt
 .stderr
 .stdout
+wandb/
 
 # The data directory
 data/
