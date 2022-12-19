@@ -4,6 +4,9 @@ mp4towaw_log.txt
 .stdout
 wandb/
 
+# Model checkpoints
+checkpoints/
+
 # The data directory
 data/
 
