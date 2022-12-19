@@ -17,8 +17,6 @@ class Dataset(torch.utils.data.Dataset):
 
         self.roberta_encoder = RobertaTokenizer.from_pretrained('roberta-base')
 
-        self.feature_embedding_model = FeatureExtractor(torch.device("cuda:0"))
-
         self.mode = mode
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
@@ -70,8 +68,8 @@ class Dataset(torch.utils.data.Dataset):
                     continue
             elif self.mode == "val":
                 if (dialogue_id, utterance_id) in {(110, 7)}:
-                # This utterance video/audio is corrupted :-(
-                continue
+                    # This utterance video/audio is corrupted :-(
+                    continue
 
             # Audio
             _wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{dialogue_id}_utt{utterance_id}.wav")
@@ -114,7 +112,5 @@ class Dataset(torch.utils.data.Dataset):
         # emotion
         emotion = [torch.stack(d["emotion"], dim=0).unsqueeze(dim=0) for d in batch]
         emotion, _ = apply_padding(emotion)
-
-        text, audio = self.feature_embedding_model(text, audio)
 
         return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}

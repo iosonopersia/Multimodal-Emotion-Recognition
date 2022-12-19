@@ -5,17 +5,18 @@ import wandb
 import numpy as np
 from utils import get_config
 from datasets.dataset import Dataset
+from models.FeatureExtractor import FeatureExtractor
 from models.M2FNet import M2FNet
 
-
-#============DEVICE===============
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(f"Using device {device}...")
 
 
 def main(config=None):
     #CONFIG
     config = get_config()
+
+    #============DEVICE===============
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"Using device {device}...")
 
     #============LOAD DATA===============
     #------------------------------------
@@ -33,6 +34,7 @@ def main(config=None):
 
     #============MODEL===============
     #--------------------------------
+    feature_embedding_model = FeatureExtractor().to(device)
     model = M2FNet(config.model).to(device)
 
     #============CRITERION===============
@@ -77,6 +79,7 @@ def main(config=None):
     print("Training...")
     training_loop(
         model,
+        feature_embedding_model,
         dl_train,
         dl_val,
         criterion,
@@ -84,12 +87,13 @@ def main(config=None):
         lr_scheduler,
         start_epoch,
         config,
+        device,
         # hyperparameter_search
     )
     print("Training complete")
 
 
-def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, start_epoch, config):
+def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -115,17 +119,21 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, s
     for epoch in range(start_epoch, epochs):
         loss_train = train(
             model,
+            feature_embedding_model,
             dl_train,
             criterion,
             optimizer,
             epoch,
-            wandb_log)
+            wandb_log,
+            device)
         losses_values.append(loss_train)
 
         loss_val, accuracy = validate(
             model,
+            feature_embedding_model,
             dl_val,
-            criterion)
+            criterion,
+            device)
         val_losses_values.append(loss_val)
 
         if save_checkpoint:
@@ -184,7 +192,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, s
 
     return {'loss_values': losses_values}
 
-def train(model, dl_train, criterion, optimizer, epoch, wandb_log):
+def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
 
     model.train()
@@ -192,8 +200,16 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log):
         print(f"Epoch {epoch} - Batch {idx_batch}/{len(dl_train)} Loss:", end="")
         text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
 
-        text["text"] = text["text"].to(device)
-        audio["audio"] = audio["audio"].to(device)
+        with torch.no_grad():
+            text = [t.to(device) for t in text]
+            audio = [[aa.to(device) for aa in a] for a in audio]
+
+            text, audio = feature_embedding_model(text, audio)
+
+        # Start recording gradients from here
+        text["text"].requires_grad_(True)
+        audio["audio"].requires_grad_(True)
+
         sentiment = sentiment.to(device)
         emotion = emotion.to(device)
 
@@ -214,11 +230,9 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log):
             global_step = epoch * len(dl_train) + idx_batch
             wandb.log({'Train_loss': running_loss, 'Global_step': global_step})
 
-        break
-
     return loss_train / len(dl_train)
 
-def validate(model, dl_val, criterion):
+def validate(model, feature_embedding_model, dl_val, criterion, device):
     loss_eval = 0
     correct_pred = 0
     total_pred = 0
@@ -228,8 +242,11 @@ def validate(model, dl_val, criterion):
         for data in dl_val:
             text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
 
-            text["text"] = text["text"].to(device)
-            audio["audio"] = audio["audio"].to(device)
+            text = [t.to(device) for t in text]
+            audio = [[aa.to(device) for aa in a] for a in audio]
+
+            text, audio = feature_embedding_model(text, audio)
+
             sentiment = sentiment.to(device)
             emotion = emotion.to(device)
 
