@@ -25,35 +25,38 @@ solver:
 model:
     AUDIO:
         EMBEDDING_SIZE: 768
-        N_HEAD: 8
-        N_LAYERS: 12
+        N_HEAD: 4
+        N_LAYERS: 4
     TEXT:
         EMBEDDING_SIZE: 768
-        N_HEAD: 8
-        N_LAYERS: 12
-    FAM:
+        N_HEAD: 4
         N_LAYERS: 4
+    FAM:
+        N_LAYERS: 2
+    CLASSIFIER:
+        N_LAYERS: 2
+        HIDDEN_SIZE: 64
     OUTPUT_SIZE: 7
 
 train:
     data_loader:
-        shuffle: False
-        batch_size: 1
-        num_workers: 0
+        shuffle: True
+        batch_size: 4
+        num_workers: 2
         pin_memory: True
 
 val:
     data_loader:
         shuffle: False
         batch_size: 1 # TODO: allow also batch_size > 1
-        num_workers: 0
+        num_workers: 2
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
         batch_size: 1
-        num_workers: 0
+        num_workers: 2
         pin_memory: True
 
 wandb:
