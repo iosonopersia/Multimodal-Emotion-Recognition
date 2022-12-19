@@ -10,6 +10,10 @@ from models.M2FNet import M2FNet
 from tqdm import tqdm
 from datetime import datetime
 
+# Suppress warnings from 'transformers' package
+from transformers import logging
+logging.set_verbosity_error()
+
 
 def main(config=None):
     #CONFIG
