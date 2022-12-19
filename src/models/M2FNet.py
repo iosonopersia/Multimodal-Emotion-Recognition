@@ -24,8 +24,10 @@ class M2FNet(nn.Module):
         self.config = config
         d_model_audio = config.AUDIO.EMBEDDING_SIZE
         d_model_text = config.TEXT.EMBEDDING_SIZE
+        d_model_fam = config.FAM.EMBEDDING_SIZE
         n_head_audio = config.AUDIO.N_HEAD
         n_head_text = config.TEXT.N_HEAD
+        n_head_fam = config.FAM.N_HEAD
         n_layers_audio = config.AUDIO.N_LAYERS
         n_layers_text = config.TEXT.N_LAYERS
         n_fam_layers = config.FAM.N_LAYERS
@@ -42,7 +44,7 @@ class M2FNet(nn.Module):
 
         # Fusion layer [Dialogue-level]
         self.fusion_layers = nn.ModuleList([
-            FusionAttention(embedding_size=d_model_audio, n_head=n_head_audio)
+            FusionAttention(embedding_size=d_model_fam, n_head=n_head_fam)
         ] * n_fam_layers)
 
         # Output layer [Dialogue-level]

@@ -32,7 +32,9 @@ model:
         N_HEAD: 4
         N_LAYERS: 4
     FAM:
-        N_LAYERS: 2
+        EMBEDDING_SIZE: 768
+        N_HEAD: 4
+        N_LAYERS: 4
     CLASSIFIER:
         N_LAYERS: 2
         HIDDEN_SIZE: 64
