@@ -37,10 +37,12 @@ class M2FNet(nn.Module):
 
         #Audio and text encoders [Dialogue-level]
         audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio)
-        self.audio_transformer = nn.TransformerEncoder(audio_encoder_layer, num_layers=n_layers_audio)
+        audio_encoder_norm = nn.LayerNorm(d_model_audio)
+        self.audio_transformer = nn.TransformerEncoder(audio_encoder_layer, num_layers=n_layers_audio, norm=audio_encoder_norm)
 
         text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text)
-        self.text_transformer = nn.TransformerEncoder(text_encoder_layer, num_layers=n_layers_text)
+        text_encoder_norm = nn.LayerNorm(d_model_text)
+        self.text_transformer = nn.TransformerEncoder(text_encoder_layer, num_layers=n_layers_text, norm=text_encoder_norm)
 
         # Fusion layer [Dialogue-level]
         self.fusion_layers = nn.ModuleList([
