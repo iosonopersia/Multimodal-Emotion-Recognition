@@ -8,6 +8,7 @@ from datasets.dataset import Dataset
 from models.FeatureExtractor import FeatureExtractor
 from models.M2FNet import M2FNet
 from tqdm import tqdm
+from datetime import datetime
 
 
 def main(config=None):
@@ -51,7 +52,9 @@ def main(config=None):
 
     #============WRITER==============
     if config.wandb.enabled:
-        wandb.init(project=config.wandb.project_name, settings=wandb.Settings(start_method='fork'))
+        os_start_method = 'spawn' if os.name == 'nt' else 'fork'
+        run_datetime = datetime.now().isoformat().split('.')[0]
+        wandb.init(project=config.wandb.project_name, name=run_datetime, settings=wandb.Settings(start_method=os_start_method))
 
     #============SCHEDULER===============
     #------------------------------------
