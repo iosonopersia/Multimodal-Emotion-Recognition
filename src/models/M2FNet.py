@@ -28,6 +28,8 @@ class M2FNet(nn.Module):
         n_layers_audio = config.AUDIO.N_LAYERS
         n_layers_text = config.TEXT.N_LAYERS
         n_fam_layers = config.FAM.N_LAYERS
+        n_layers_classifier = config.CLASSIFIER.N_LAYERS
+        hidden_size_classifier = config.CLASSIFIER.HIDDEN_SIZE
         output_size = config.OUTPUT_SIZE
 
         #Audio and text encoders [Dialogue-level]
@@ -43,10 +45,15 @@ class M2FNet(nn.Module):
         ] * n_fam_layers)
 
         # Output layer [Dialogue-level]
-        self.output_layer = nn.Sequential(
-            nn.Linear(2*d_model_audio, 32),
-            nn.ReLU(),
-            nn.Linear(32, output_size))
+        classifier_head = [nn.Linear(d_model_text + d_model_audio, hidden_size_classifier)]
+        for _ in range(n_layers_classifier - 2):
+            classifier_head.append(nn.ReLU())
+            classifier_head.append(nn.Linear(hidden_size_classifier, hidden_size_classifier))
+
+        classifier_head.append(nn.ReLU())
+        classifier_head.append(nn.Linear(hidden_size_classifier, output_size))
+
+        self.output_layer = nn.Sequential(*classifier_head)
 
     def forward(self, text, audio):
         text, text_lengths = text["text"], text["lengths"]
