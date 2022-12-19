@@ -202,22 +202,22 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
     for idx_batch, data in tqdm(enumerate(dl_train), total=len(dl_train)):
         text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
 
+        sentiment = sentiment.to(device)
+        emotion = emotion.to(device)
+
         with torch.no_grad():
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
 
-            text, audio = feature_embedding_model(text, audio)
+            text, audio, mask = feature_embedding_model(text, audio)
 
         # Start recording gradients from here
-        text["text"].requires_grad_(True)
-        audio["audio"].requires_grad_(True)
-
-        sentiment = sentiment.to(device)
-        emotion = emotion.to(device)
+        text.requires_grad_(True)
+        audio.requires_grad_(True)
 
         # Feature extractor
         optimizer.zero_grad()
-        outputs = model(text, audio)
+        outputs = model(text, audio, mask)
         loss = criterion(outputs, emotion.float())
         loss.backward()
         optimizer.step()
@@ -244,12 +244,12 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
 
-            text, audio = feature_embedding_model(text, audio)
+            text, audio, mask = feature_embedding_model(text, audio)
 
             sentiment = sentiment.to(device)
             emotion = emotion.to(device)
 
-            outputs = model(text, audio)
+            outputs = model(text, audio, mask)
             loss = criterion(outputs, emotion.float())
 
             # Calculate metrics

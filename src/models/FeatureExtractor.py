@@ -65,10 +65,13 @@ class FeatureExtractor(torch.nn.Module):
             batch_text_features.append(text_features)
             batch_audio_features.append(audio_features)
 
-        batch_text_features, batch_text_features_length = apply_padding(batch_text_features)
-        batch_text_features = {"text": batch_text_features, "lengths": batch_text_features_length}
+        batch_text_features, dialogue_lengths = apply_padding(batch_text_features)
+        batch_audio_features, _ = apply_padding(batch_audio_features)
 
-        batch_audio_features, batch_audio_features_length = apply_padding(batch_audio_features)
-        batch_audio_features = {"audio": batch_audio_features, "lengths": batch_audio_features_length}
+        # Lengths to attention masks:
+        attention_mask = torch.zeros(batch_text_features.shape[0], batch_text_features.shape[1], dtype=torch.bool)
+        for i in range(batch_text_features.shape[0]):
+            attention_mask[i, :dialogue_lengths[i]] = True
+        attention_mask = attention_mask.to(batch_text_features.device)
 
-        return batch_text_features, batch_audio_features
+        return batch_text_features, batch_audio_features, attention_mask

@@ -10,8 +10,9 @@ class FusionAttention(nn.Module):
         self.relu = nn.ReLU()
 
 
-    def forward(self, embedding_text, embedding_audio):
-        x, _ = self.multihead_attention(embedding_text, embedding_audio, embedding_text)
+    def forward(self, embedding_text, embedding_audio, mask):#, src_key_padding_mask):
+        x, _ = self.multihead_attention(embedding_text, embedding_audio, embedding_text, attn_mask=mask)#, key_padding_mask=src_key_padding_mask)
+
         x = torch.cat((x, embedding_text), dim=2)
         x = self.relu(x)
         x = self.linear(x)
@@ -55,22 +56,32 @@ class M2FNet(nn.Module):
 
         self.output_layer = nn.Sequential(*classifier_head)
 
-    def forward(self, text, audio):
-        text, text_lengths = text["text"], text["lengths"]
-        audio, audio_lengths = audio["audio"], audio["lengths"]
-
+    def forward(self, text, audio, mask):
         # Audio and text encoders
         # TODO pass the previous and next utterance to the feature extractor
         # TODO construct the mask for the audio and text encoders (starting from the lengths)
-        dialogue_audio_features = self.audio_transformer(audio, mask=None)
-        dialogue_text_features = self.text_transformer(text, mask=None)
+
+        text = text.permute(1, 0, 2)
+        audio = audio.permute(1, 0, 2)
+
+        # (batch_size, seq_len, seq_len)
+        squared_mask = mask.unsqueeze(1).repeat(1, mask.shape[1], 1)
+        squared_mask = squared_mask & squared_mask.transpose(1, 2)
+        squared_mask = squared_mask.repeat(8, 1, 1)
+        squared_mask = squared_mask.float() # Convert from bool to float for the transformer
+
+        text = self.text_transformer(text, mask=squared_mask)#, src_key_padding_mask=mask)
+        audio = self.audio_transformer(audio, mask=squared_mask)#, src_key_padding_mask=mask)
+
+        text = text.permute(1, 0, 2)
+        audio = audio.permute(1, 0, 2)
 
         # Fusion layer
         for fusion_layer in self.fusion_layers:
-            dialogue_text_features = fusion_layer(dialogue_audio_features, dialogue_text_features)
+            text = fusion_layer(audio, text, mask=squared_mask)#, src_key_padding_mask=mask)
 
         # concatenation layer
-        x = torch.cat((dialogue_audio_features, dialogue_text_features), dim=2)
+        x = torch.cat((audio, text), dim=2)
 
         # Output layer
         x = self.output_layer(x)
