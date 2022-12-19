@@ -7,7 +7,7 @@ from utils import get_config
 from datasets.dataset import Dataset
 from models.FeatureExtractor import FeatureExtractor
 from models.M2FNet import M2FNet
-
+from tqdm import tqdm
 
 
 def main(config=None):
@@ -196,8 +196,7 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
     loss_train = 0
 
     model.train()
-    for idx_batch, data in enumerate(dl_train):
-        print(f"Epoch {epoch} - Batch {idx_batch}/{len(dl_train)} Loss:", end="")
+    for idx_batch, data in tqdm(enumerate(dl_train), total=len(dl_train)):
         text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
 
         with torch.no_grad():
@@ -222,9 +221,6 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
 
         loss_train += loss.item()
 
-        running_loss = loss_train / (idx_batch + 1)
-        print(f" {running_loss:.3E}")
-
         if wandb_log:
             running_loss = loss_train / (idx_batch + 1)
             global_step = epoch * len(dl_train) + idx_batch
@@ -239,7 +235,7 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
 
     model.eval()
     with torch.inference_mode():
-        for data in dl_val:
+        for data in tqdm(dl_val, total=len(dl_val)):
             text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
 
             text = [t.to(device) for t in text]
