@@ -153,7 +153,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
 
         print(f'Epoch: {epoch} '
               f' Lr: {lr:.8f} '
-              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3E}%]')
+              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3f}%]')
 
         if wandb_log:
             wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy})
