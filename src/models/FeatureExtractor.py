@@ -26,51 +26,49 @@ class MeanPooling(torch.nn.Module):
 
 
 class FeatureExtractor(torch.nn.Module):
-    def __init__(self, device):
+    def __init__(self):
         super().__init__()
-        self.roberta = RobertaModel.from_pretrained('roberta-base').to(device)
+        self.roberta = RobertaModel.from_pretrained('roberta-base')
         self.bundle = torchaudio.pipelines.WAV2VEC2_BASE
-        self.wav2vec = self.bundle.get_model().to(device)
-        self.mean_pooling = MeanPoolingWithoutPadding().to(device)
-        self.device = device
+        self.wav2vec = self.bundle.get_model()
+        self.mean_pooling = MeanPoolingWithoutPadding()
 
     def forward(self, batch_text, batch_audio):
-        with torch.inference_mode():
-            batch_text_features = []
-            batch_audio_features = []
-            for text, audio in zip(batch_text, batch_audio):
-                # text embeddings
-                text_input_ids = text["input_ids"]
-                text_attention_mask = text["attention_mask"]
+        batch_text_features = []
+        batch_audio_features = []
+        for text, audio in zip(batch_text, batch_audio):
+            # text embeddings
+            text_input_ids = text["input_ids"]
+            text_attention_mask = text["attention_mask"]
 
-                text_features = self.roberta(input_ids=text_input_ids.to(self.device), attention_mask=text_attention_mask.to(self.device))
-                text_features = text_features.last_hidden_state
-                text_features = self.mean_pooling(text_features, text_attention_mask.sum(dim=1))
+            text_features = self.roberta(input_ids=text_input_ids, attention_mask=text_attention_mask)
+            text_features = text_features.last_hidden_state
+            text_features = self.mean_pooling(text_features, text_attention_mask.sum(dim=1))
 
-                # audio embeddings
+            # audio embeddings
 
-                # Unfortunately, wav2vec2 requires a lot of memory, so we cannot afford to process all the batch at once:
-                audio_features = []
-                for a in audio:
-                    _audio_features, _ = self.wav2vec.extract_features(waveforms=a.to(self.device))
-                    _audio_features = _audio_features[-1] # last hidden state
-                    audio_features.append(_audio_features)
+            # Unfortunately, wav2vec2 requires a lot of memory, so we cannot afford to process all the batch at once:
+            audio_features = []
+            for a in audio:
+                _audio_features, _ = self.wav2vec.extract_features(waveforms=a)
+                _audio_features = _audio_features[-1] # last hidden state
+                audio_features.append(_audio_features)
 
-                # ! Applying padding here is useless if we use MeanPoolingWithoutPadding!
-                audio_features, lengths = apply_padding(audio_features)
-                audio_features = self.mean_pooling(audio_features, lengths)
+            # ! Applying padding here is useless if we use MeanPoolingWithoutPadding!
+            audio_features, lengths = apply_padding(audio_features)
+            audio_features = self.mean_pooling(audio_features, lengths)
 
-                # Add batch dimension
-                text_features = text_features.unsqueeze(dim=0)
-                audio_features = audio_features.unsqueeze(dim=0)
+            # Add batch dimension
+            text_features = text_features.unsqueeze(dim=0)
+            audio_features = audio_features.unsqueeze(dim=0)
 
-                batch_text_features.append(text_features)
-                batch_audio_features.append(audio_features)
+            batch_text_features.append(text_features)
+            batch_audio_features.append(audio_features)
 
-            batch_text_features, batch_text_features_length = apply_padding(batch_text_features)
-            batch_text_features = {"text": batch_text_features.cpu(), "lengths": batch_text_features_length.cpu()}
+        batch_text_features, batch_text_features_length = apply_padding(batch_text_features)
+        batch_text_features = {"text": batch_text_features, "lengths": batch_text_features_length}
 
-            batch_audio_features, batch_audio_features_length = apply_padding(batch_audio_features)
-            batch_audio_features = {"audio": batch_audio_features.cpu(), "lengths": batch_audio_features_length.cpu()}
+        batch_audio_features, batch_audio_features_length = apply_padding(batch_audio_features)
+        batch_audio_features = {"audio": batch_audio_features, "lengths": batch_audio_features_length}
 
         return batch_text_features, batch_audio_features
