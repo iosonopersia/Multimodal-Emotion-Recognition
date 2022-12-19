@@ -27,7 +27,7 @@ class M2FNet(nn.Module):
         d_model_fam = config.FAM.EMBEDDING_SIZE
         self.n_head_audio = config.AUDIO.N_HEAD
         self.n_head_text = config.TEXT.N_HEAD
-        n_head_fam = config.FAM.N_HEAD
+        self.n_head_fam = config.FAM.N_HEAD
         n_layers_audio = config.AUDIO.N_LAYERS
         n_layers_text = config.TEXT.N_LAYERS
         n_fam_layers = config.FAM.N_LAYERS
@@ -46,7 +46,7 @@ class M2FNet(nn.Module):
 
         # Fusion layer [Dialogue-level]
         self.fusion_layers = nn.ModuleList([
-            FusionAttention(embedding_size=d_model_fam, n_head=n_head_fam)
+            FusionAttention(embedding_size=d_model_fam, n_head=self.n_head_fam)
         ] * n_fam_layers)
 
         # Output layer [Dialogue-level]
@@ -73,6 +73,7 @@ class M2FNet(nn.Module):
         squared_mask = squared_mask & squared_mask.transpose(1, 2)
         squared_mask_text = squared_mask.repeat(self.n_head_text, 1, 1).float()
         squared_mask_audio = squared_mask.repeat(self.n_head_audio, 1, 1).float()
+        squared_mask_fam = squared_mask.repeat(self.n_head_fam, 1, 1).float()
 
         text = self.text_transformer(text, mask=squared_mask_text)#, src_key_padding_mask=mask)
         audio = self.audio_transformer(audio, mask=squared_mask_audio)#, src_key_padding_mask=mask)
@@ -82,7 +83,7 @@ class M2FNet(nn.Module):
 
         # Fusion layer
         for fusion_layer in self.fusion_layers:
-            text = fusion_layer(audio, text, mask=squared_mask)#, src_key_padding_mask=mask)
+            text = fusion_layer(audio, text, mask=squared_mask_fam)#, src_key_padding_mask=mask)
 
         # concatenation layer
         x = torch.cat((audio, text), dim=2)
