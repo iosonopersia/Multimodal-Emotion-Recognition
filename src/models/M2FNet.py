@@ -25,8 +25,8 @@ class M2FNet(nn.Module):
         d_model_audio = config.AUDIO.EMBEDDING_SIZE
         d_model_text = config.TEXT.EMBEDDING_SIZE
         d_model_fam = config.FAM.EMBEDDING_SIZE
-        n_head_audio = config.AUDIO.N_HEAD
-        n_head_text = config.TEXT.N_HEAD
+        self.n_head_audio = config.AUDIO.N_HEAD
+        self.n_head_text = config.TEXT.N_HEAD
         n_head_fam = config.FAM.N_HEAD
         n_layers_audio = config.AUDIO.N_LAYERS
         n_layers_text = config.TEXT.N_LAYERS
@@ -36,10 +36,10 @@ class M2FNet(nn.Module):
         output_size = config.OUTPUT_SIZE
 
         #Audio and text encoders [Dialogue-level]
-        audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=n_head_audio)
+        audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio)
         self.audio_transformer = nn.TransformerEncoder(audio_encoder_layer, num_layers=n_layers_audio)
 
-        text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=n_head_text)
+        text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text)
         self.text_transformer = nn.TransformerEncoder(text_encoder_layer, num_layers=n_layers_text)
 
         # Fusion layer [Dialogue-level]
@@ -69,11 +69,11 @@ class M2FNet(nn.Module):
         # (batch_size, seq_len, seq_len)
         squared_mask = mask.unsqueeze(1).repeat(1, mask.shape[1], 1)
         squared_mask = squared_mask & squared_mask.transpose(1, 2)
-        squared_mask = squared_mask.repeat(8, 1, 1)
-        squared_mask = squared_mask.float() # Convert from bool to float for the transformer
+        squared_mask_text = squared_mask.repeat(self.n_head_text, 1, 1).float()
+        squared_mask_audio = squared_mask.repeat(self.n_head_audio, 1, 1).float()
 
-        text = self.text_transformer(text, mask=squared_mask)#, src_key_padding_mask=mask)
-        audio = self.audio_transformer(audio, mask=squared_mask)#, src_key_padding_mask=mask)
+        text = self.text_transformer(text, mask=squared_mask_text)#, src_key_padding_mask=mask)
+        audio = self.audio_transformer(audio, mask=squared_mask_audio)#, src_key_padding_mask=mask)
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)

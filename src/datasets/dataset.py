@@ -26,24 +26,16 @@ class Dataset(torch.utils.data.Dataset):
             self.audio_path = "data/MELD.Raw/output_repeated_splits_test/wav"
 
         self.text = get_text(mode)
-        self.sentiment_labels = self.text["Sentiment"]
-        self.emotion_labels = self.text["Emotion"]
 
-        # labels to one-hot encoding
-        sentiment_labels = ["neutral", "negative", "positive"]
-        num_sentiments = len(sentiment_labels)
-        sent_oneh = torch.nn.functional.one_hot(torch.arange(0, num_sentiments, dtype=torch.int64), num_classes=num_sentiments)
-        self.sentiment2oneh = {sent: sent_oneh for sent, sent_oneh in zip(sentiment_labels, sent_oneh)}
+        # Map labels to class indices
+        sentiment_labels = {"neutral": 0, "negative": 1, "positive": 2}
+        self.text["Sentiment"] = self.text["Sentiment"].map(sentiment_labels)
 
-        emotion_labels = ["neutral", "joy", "sadness", "anger", "surprise", "fear", "disgust"]
-        num_emotions = len(emotion_labels)
-        emo_oneh = torch.nn.functional.one_hot(torch.arange(0, num_emotions, dtype=torch.int64), num_classes=num_emotions)
-        self.emotion2oneh = {emo: emo_oneh for emo, emo_oneh in zip(emotion_labels, emo_oneh)}
+        # Map labels to class indices
+        emotion_labels = {"neutral": 0, "joy": 1, "sadness": 2, "anger": 3, "surprise": 4, "fear": 5, "disgust": 6}
+        self.text["Emotion"] = self.text["Emotion"].map(emotion_labels)
 
-        # Inversed dictionaries
-        self.oneh2sentiment = {h: sent for h, sent in self.sentiment2oneh.items()}
-        self.oneh2emotion = {h: emo for h, emo in self.emotion2oneh.items()}
-
+        # Count how many dialogues there are
         self.dialogue_ids = self.text["Dialogue_ID"].unique()
         print(f"Loaded {len(self.dialogue_ids)} dialogues for {self.mode}ing")
 
@@ -80,14 +72,16 @@ class Dataset(torch.utils.data.Dataset):
 
             # Sentiment
             _sentiment = utterance["Sentiment"]
+            _sentiment = torch.tensor([_sentiment])
 
             # Emotion
             _emotion = utterance["Emotion"]
+            _emotion = torch.tensor([_emotion])
 
             audio.append(_audio)
             text.append(_text)
-            sentiment.append(self.sentiment2oneh[_sentiment])
-            emotion.append(self.emotion2oneh[_emotion])
+            sentiment.append(_sentiment)
+            emotion.append(_emotion)
 
         # Tokenize text
         text = self.roberta_encoder(text, return_tensors="pt", padding="longest")
@@ -107,10 +101,12 @@ class Dataset(torch.utils.data.Dataset):
 
         # sentiment
         sentiment = [torch.stack(d["sentiment"], dim=0).unsqueeze(dim=0) for d in batch]
-        sentiment, _ = apply_padding(sentiment)
+        sentiment, _ = apply_padding(sentiment, padding_value=-1) # -1 class index is ignored during loss computation
+        sentiment = sentiment.squeeze(dim=2)
 
         # emotion
         emotion = [torch.stack(d["emotion"], dim=0).unsqueeze(dim=0) for d in batch]
-        emotion, _ = apply_padding(emotion)
+        emotion, _ = apply_padding(emotion, padding_value=-1) # -1 class index is ignored during loss computation
+        emotion = emotion.squeeze(dim=2)
 
         return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
