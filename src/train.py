@@ -2,7 +2,6 @@ from genericpath import exists
 import os
 import torch
 import wandb
-import numpy as np
 from utils import get_config
 from datasets.dataset import Dataset
 from models.FeatureExtractor import FeatureExtractor
@@ -46,7 +45,7 @@ def main(config=None):
     #------------------------------------
     criterion = config.solver.loss_fn
     if criterion == "CE":
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss(ignore_index=-1) # TODO: add weights in order to balance the classes!
     else:
         raise ValueError("Criterion not supported")
 
@@ -222,7 +221,7 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
         # Feature extractor
         optimizer.zero_grad()
         outputs = model(text, audio, mask)
-        loss = criterion(outputs, emotion.float())
+        loss = criterion(outputs.permute(0, 2, 1), emotion)
         loss.backward()
         optimizer.step()
 
@@ -254,18 +253,14 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
             emotion = emotion.to(device)
 
             outputs = model(text, audio, mask)
-            loss = criterion(outputs, emotion.float())
+            loss = criterion(outputs.permute(0, 2, 1), emotion)
 
             # Calculate metrics
-
-            total_pred += outputs.shape[0] * outputs.shape[1]
             for i in range(outputs.shape[0]):
-                # ! This computation expects the mini-batch to be of size 1,
-                # ! hence it's incorrect for larger mini-batches
-                # FIXME
-                emotion_pred = np.argmax(outputs[i].detach().cpu().numpy(), axis=1)
-                emotion_true = np.argmax(emotion[i].detach().cpu().numpy(), axis=1)
-                correct_pred += np.sum(emotion_pred == emotion_true)
+                total_pred += (emotion[i] != -1).sum().item()
+                emotion_predicted = torch.argmax(outputs[[i]], dim=2)
+                emotion_true = emotion[[i]]
+                correct_pred += ((emotion_predicted == emotion_true) & (emotion_true != -1)).sum().item()
 
             loss_eval += loss.item()
 
