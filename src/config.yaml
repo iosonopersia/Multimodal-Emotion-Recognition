@@ -50,14 +50,14 @@ train:
 val:
     data_loader:
         shuffle: False
-        batch_size: 1 # TODO: allow also batch_size > 1
+        batch_size: 4
         num_workers: 2
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
-        batch_size: 1
+        batch_size: 4
         num_workers: 2
         pin_memory: True
 
