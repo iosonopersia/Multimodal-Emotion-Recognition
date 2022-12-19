@@ -64,7 +64,12 @@ class Dataset(torch.utils.data.Dataset):
         for _, utterance in utterances.iterrows():
             utterance_id = utterance["Utterance_ID"]
 
-            if dialogue_id == 125 and utterance_id == 3:
+            if self.mode == "train":
+                if (dialogue_id, utterance_id) in {(125, 3)}:
+                    # This utterance video/audio is corrupted :-(
+                    continue
+            elif self.mode == "val":
+                if (dialogue_id, utterance_id) in {(110, 7)}:
                 # This utterance video/audio is corrupted :-(
                 continue
 
