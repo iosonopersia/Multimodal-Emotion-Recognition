@@ -11,5 +11,6 @@ torchvision==0.14.1
 tqdm==4.64.1
 transformers==4.25.1
 wandb==0.13.7
+scikit-learn==1.2.0
 
 --extra-index-url https://download.pytorch.org/whl/cu117
