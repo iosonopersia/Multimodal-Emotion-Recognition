@@ -28,8 +28,8 @@ class M2FNet(nn.Module):
         self.n_head_audio = config.AUDIO.N_HEAD
         self.n_head_text = config.TEXT.N_HEAD
         self.n_head_fam = config.FAM.N_HEAD
-        n_layers_audio = config.AUDIO.N_LAYERS
-        n_layers_text = config.TEXT.N_LAYERS
+        self.n_layers_audio = config.AUDIO.N_LAYERS
+        self.n_layers_text = config.TEXT.N_LAYERS
         n_fam_layers = config.FAM.N_LAYERS
         n_layers_classifier = config.CLASSIFIER.N_LAYERS
         hidden_size_classifier = config.CLASSIFIER.HIDDEN_SIZE
@@ -38,11 +38,11 @@ class M2FNet(nn.Module):
         #Audio and text encoders [Dialogue-level]
         audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio)
         audio_encoder_norm = nn.LayerNorm(d_model_audio)
-        self.audio_transformer = nn.TransformerEncoder(audio_encoder_layer, num_layers=n_layers_audio, norm=audio_encoder_norm)
+        self.audio_transformer = nn.TransformerEncoder(audio_encoder_layer, num_layers=1, norm=audio_encoder_norm)
 
         text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text)
         text_encoder_norm = nn.LayerNorm(d_model_text)
-        self.text_transformer = nn.TransformerEncoder(text_encoder_layer, num_layers=n_layers_text, norm=text_encoder_norm)
+        self.text_transformer = nn.TransformerEncoder(text_encoder_layer, num_layers=1, norm=text_encoder_norm)
 
         # Fusion layer [Dialogue-level]
         self.fusion_layers = nn.ModuleList([
@@ -77,6 +77,14 @@ class M2FNet(nn.Module):
 
         text = self.text_transformer(text, mask=squared_mask_text)#, src_key_padding_mask=mask)
         audio = self.audio_transformer(audio, mask=squared_mask_audio)#, src_key_padding_mask=mask)
+
+        # Add skip connections to audio encoders
+        for i in range(self.n_layers_audio - 1):
+            audio = audio + self.audio_transformer(audio, mask=squared_mask_audio)
+
+        # Add skip connections to text encoders
+        for i in range(self.n_layers_text - 1):
+            text = text + self.text_transformer(text, mask=squared_mask_text)
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
