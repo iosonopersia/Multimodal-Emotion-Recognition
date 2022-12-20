@@ -110,3 +110,6 @@ class Dataset(torch.utils.data.Dataset):
         emotion = emotion.squeeze(dim=2)
 
         return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
+
+    def get_labels(self):
+        return self.text["Sentiment"], self.text["Emotion"]

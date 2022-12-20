@@ -8,6 +8,7 @@ from models.FeatureExtractor import FeatureExtractor
 from models.M2FNet import M2FNet
 from tqdm import tqdm
 from datetime import datetime
+from sklearn.utils import class_weight
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -44,8 +45,15 @@ def main(config=None):
     #============CRITERION===============
     #------------------------------------
     criterion = config.solver.loss_fn
+    balance_classes = config.solver.balance_classes
     if criterion == "CE":
-        criterion = torch.nn.CrossEntropyLoss(ignore_index=-1) # TODO: add weights in order to balance the classes!
+        if balance_classes:
+            _, emotions = data_train.get_labels() # Use training data to compute class weights
+            class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=sorted(emotions.unique()), y=emotions.values)
+            class_weights = torch.tensor(class_weights, dtype=torch.float).to(device)
+            criterion = torch.nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
+        else:
+            criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
     else:
         raise ValueError("Criterion not supported")
 

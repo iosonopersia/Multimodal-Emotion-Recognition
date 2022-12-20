@@ -11,6 +11,7 @@ checkpoint:
 
 solver:
     loss_fn: CE
+    balance_classes: False
     lr: 1.0e-3
     epochs: 1000
     scheduler:
