@@ -59,7 +59,7 @@ def main(config=None):
 
     #============OPTIMIZER===============
     #------------------------------------
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.solver.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.solver.lr, weight_decay=config.solver.weight_decay)
 
     #============WRITER==============
     if config.wandb.enabled:
