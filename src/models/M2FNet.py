@@ -36,13 +36,15 @@ class M2FNet(nn.Module):
         output_size = config.OUTPUT_SIZE
 
         #Audio and text encoders [Dialogue-level]
-        audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio)
-        audio_encoder_norm = nn.LayerNorm(d_model_audio)
-        self.audio_transformer = nn.TransformerEncoder(audio_encoder_layer, num_layers=1, norm=audio_encoder_norm)
+        self.audio_encoder_layers = nn.ModuleList([
+            nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio)
+        ] * self.n_layers_audio)
+        self.audio_encoder_norm = nn.LayerNorm(d_model_audio)
 
-        text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text)
-        text_encoder_norm = nn.LayerNorm(d_model_text)
-        self.text_transformer = nn.TransformerEncoder(text_encoder_layer, num_layers=1, norm=text_encoder_norm)
+        self.text_encoder_layers = nn.ModuleList([
+            nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text)
+        ] * self.n_layers_text)
+        self.text_encoder_norm = nn.LayerNorm(d_model_text)
 
         # Fusion layer [Dialogue-level]
         self.fusion_layers = nn.ModuleList([
@@ -51,9 +53,10 @@ class M2FNet(nn.Module):
 
         # Output layer [Dialogue-level]
         classifier_head = [nn.Linear(d_model_text + d_model_audio, hidden_size_classifier)]
-        for _ in range(n_layers_classifier - 2):
-            classifier_head.append(nn.ReLU())
-            classifier_head.append(nn.Linear(hidden_size_classifier, hidden_size_classifier))
+        if n_layers_classifier > 2:
+            for _ in range(n_layers_classifier - 2):
+                classifier_head.append(nn.ReLU())
+                classifier_head.append(nn.Linear(hidden_size_classifier, hidden_size_classifier))
 
         classifier_head.append(nn.ReLU())
         classifier_head.append(nn.Linear(hidden_size_classifier, output_size))
@@ -75,16 +78,15 @@ class M2FNet(nn.Module):
         squared_mask_audio = squared_mask.repeat(self.n_head_audio, 1, 1).float()
         squared_mask_fam = squared_mask.repeat(self.n_head_fam, 1, 1).float()
 
-        text = self.text_transformer(text, mask=squared_mask_text)#, src_key_padding_mask=mask)
-        audio = self.audio_transformer(audio, mask=squared_mask_audio)#, src_key_padding_mask=mask)
-
         # Add skip connections to audio encoders
-        for i in range(self.n_layers_audio - 1):
-            audio = audio + self.audio_transformer(audio, mask=squared_mask_audio)
+        for layer in self.audio_encoder_layers:
+            audio = audio + layer(audio, src_mask=squared_mask_audio)#, src_key_padding_mask=mask)
+        audio = self.audio_encoder_norm(audio)
 
         # Add skip connections to text encoders
-        for i in range(self.n_layers_text - 1):
-            text = text + self.text_transformer(text, mask=squared_mask_text)
+        for layer in self.text_encoder_layers:
+            text = text + layer(text, src_mask=squared_mask_text)#, src_key_padding_mask=mask)
+        text = self.text_encoder_norm(text)
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
