@@ -12,30 +12,30 @@ checkpoint:
 solver:
     loss_fn: CE
     balance_classes: False
-    lr: 1.0e-3
-    epochs: 1000
+    lr: 5.0e-5
+    epochs: 100
     scheduler:
         enabled: False
         scheduler_fn: ExponentialLR
         gamma: 0.98
     early_stopping:
-        enabled: True
+        enabled: False
         patience: 10
         restore_best_weights: True
 
 model:
     AUDIO:
         EMBEDDING_SIZE: 768
-        N_HEAD: 4
-        N_LAYERS: 4
+        N_HEAD: 8
+        N_LAYERS: 1
     TEXT:
         EMBEDDING_SIZE: 768
-        N_HEAD: 4
-        N_LAYERS: 4
+        N_HEAD: 8
+        N_LAYERS: 1
     FAM:
         EMBEDDING_SIZE: 768
-        N_HEAD: 4
-        N_LAYERS: 4
+        N_HEAD: 8
+        N_LAYERS: 5
     CLASSIFIER:
         N_LAYERS: 2
         HIDDEN_SIZE: 64
@@ -45,21 +45,21 @@ train:
     data_loader:
         shuffle: True
         batch_size: 4
-        num_workers: 2
+        num_workers: 0
         pin_memory: True
 
 val:
     data_loader:
         shuffle: False
         batch_size: 4
-        num_workers: 2
+        num_workers: 0
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
         batch_size: 4
-        num_workers: 2
+        num_workers: 0
         pin_memory: True
 
 wandb:
