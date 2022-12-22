@@ -129,7 +129,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
     save_checkpoint = checkpoint_cfg.save_checkpoint
     save_checkpoint_path = checkpoint_cfg.save_path
 
-    if wandb_log:
+    if wandb_log and wandb_cfg.watch_model:
         wandb.watch(
             model,
             criterion=criterion,
