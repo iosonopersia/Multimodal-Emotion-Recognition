@@ -3,9 +3,9 @@ import torch.nn as nn
 
 
 class FusionAttention(nn.Module):
-    def __init__(self, embedding_size, n_head):
+    def __init__(self, embedding_size, n_head, dropout):
         super().__init__()
-        self.multihead_attention = nn.MultiheadAttention(embedding_size, n_head, batch_first=True)
+        self.multihead_attention = nn.MultiheadAttention(embedding_size, n_head, batch_first=True, dropout=dropout)
         self.linear = nn.Linear(2*embedding_size, embedding_size)
         self.relu = nn.ReLU()
 
@@ -22,6 +22,7 @@ class M2FNet(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        dropout = config.DROPOUT
         d_model_audio = config.AUDIO.EMBEDDING_SIZE
         d_model_text = config.TEXT.EMBEDDING_SIZE
         d_model_fam = config.FAM.EMBEDDING_SIZE
@@ -37,18 +38,18 @@ class M2FNet(nn.Module):
 
         #Audio and text encoders [Dialogue-level]
         self.audio_encoder_layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio)
+            nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
         ] * self.n_layers_audio)
         self.audio_encoder_norm = nn.LayerNorm(d_model_audio)
 
         self.text_encoder_layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text)
+            nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text, dropout=dropout)
         ] * self.n_layers_text)
         self.text_encoder_norm = nn.LayerNorm(d_model_text)
 
         # Fusion layer [Dialogue-level]
         self.fusion_layers = nn.ModuleList([
-            FusionAttention(embedding_size=d_model_fam, n_head=self.n_head_fam)
+            FusionAttention(embedding_size=d_model_fam, n_head=self.n_head_fam, dropout=dropout)
         ] * n_fam_layers)
 
         # Output layer [Dialogue-level]

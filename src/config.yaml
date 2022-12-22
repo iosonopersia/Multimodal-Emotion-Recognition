@@ -25,6 +25,7 @@ solver:
         restore_best_weights: True
 
 model:
+    DROPOUT: 0.4
     AUDIO:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
