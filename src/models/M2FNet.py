@@ -10,10 +10,10 @@ class FusionAttentionLayer(nn.Module):
         self.relu = nn.ReLU()
 
 
-    def forward(self, embedding_text, embedding_audio, mask):#, src_key_padding_mask):
-        x, _ = self.multihead_attention(embedding_text, embedding_audio, embedding_text, attn_mask=mask)#, key_padding_mask=src_key_padding_mask)
+    def forward(self, text, audio, key_padding_mask):
+        x, _ = self.multihead_attention(query=text, key=audio, value=text, key_padding_mask=key_padding_mask)
 
-        x = torch.cat((x, embedding_text), dim=2)
+        x = torch.cat((x, text), dim=2)
         x = self.relu(x)
         x = self.linear(x)
         return x
@@ -75,42 +75,28 @@ class M2FNet(nn.Module):
         self.output_layer = nn.Sequential(*classifier_head)
 
     def forward(self, text, audio, mask):
-        # Audio and text encoders
-        # TODO pass the previous and next utterance to the feature extractor
-        # TODO construct the mask for the audio and text encoders (starting from the lengths)
-
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
 
-        # (batch_size, seq_len, seq_len)
-        squared_mask = mask.unsqueeze(1).repeat(1, mask.shape[1], 1)
-        squared_mask = squared_mask & squared_mask.transpose(1, 2)
-        squared_mask_text = squared_mask.repeat(self.n_head_text, 1, 1)
-        squared_mask_audio = squared_mask.repeat(self.n_head_audio, 1, 1)
-        squared_mask_fam = squared_mask.repeat(self.n_head_fam, 1, 1)
-
-        # Add skip connections to audio encoders
+        # Audio encoders with local skip connections
         for encoder in self.audio_encoders:
-            # , src_key_padding_mask=mask)
-            audio = audio + encoder(audio, mask=squared_mask_audio)
+            audio = audio + encoder(audio, src_key_padding_mask=mask)
 
-        # Add skip connections to text encoders
+        # Text encoders with local skip connections
         for encoder in self.text_encoders:
-            # , src_key_padding_mask=mask)
-            text = text + encoder(text, mask=squared_mask_text)
+            text = text + encoder(text, src_key_padding_mask=mask)
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
 
-        # Fusion layer
+        # Fusion Attention layers
         for fusion_layer in self.fusion_layers:
-            # , src_key_padding_mask=mask)
-            text = fusion_layer(audio, text, mask=squared_mask_fam)
+            text = fusion_layer(text=text, audio=audio, key_padding_mask=mask)
 
         # Concatenation layer
         x = torch.cat((audio, text), dim=2)
 
-        # Output layer
+        # Fully Connected output layer
         x = self.output_layer(x)
 
         return x

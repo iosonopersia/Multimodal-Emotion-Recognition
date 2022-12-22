@@ -41,6 +41,7 @@ class FeatureExtractor(torch.nn.Module):
             text_input_ids = text["input_ids"]
             text_attention_mask = text["attention_mask"]
 
+            # TODO pass the previous and next utterance to the feature extractor
             text_features = self.roberta(input_ids=text_input_ids, attention_mask=text_attention_mask)
             text_features = text_features.last_hidden_state
             text_features = self.mean_pooling(text_features, text_attention_mask.sum(dim=1))
