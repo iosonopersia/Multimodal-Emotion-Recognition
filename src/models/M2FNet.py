@@ -46,16 +46,16 @@ class M2FNet(nn.Module):
 
         # Audio and text encoders
         audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
+        audio_encoder_norm = nn.LayerNorm(d_model_audio)
         self.audio_encoders = nn.ModuleList([
-            nn.TransformerEncoder(encoder_layer=audio_encoder_layer, num_layers=n_layers_audio)
+            nn.TransformerEncoder(encoder_layer=audio_encoder_layer, norm=audio_encoder_norm, num_layers=n_layers_audio)
             for _ in range(n_encoders_audio)])
-        self.audio_encoders_norm = nn.LayerNorm(d_model_audio)
 
         text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text, dropout=dropout)
+        text_encoder_norm = nn.LayerNorm(d_model_text)
         self.text_encoders = nn.ModuleList([
-            nn.TransformerEncoder(encoder_layer=text_encoder_layer, num_layers=n_layers_text)
+            nn.TransformerEncoder(encoder_layer=text_encoder_layer, norm=text_encoder_norm, num_layers=n_layers_text)
             for _ in range(n_encoders_text)])
-        self.text_encoders_norm = nn.LayerNorm(d_model_text)
 
         # Fusion Attention layers
         self.fusion_layers = nn.ModuleList([
@@ -93,13 +93,11 @@ class M2FNet(nn.Module):
         for encoder in self.audio_encoders:
             # , src_key_padding_mask=mask)
             audio = audio + encoder(audio, mask=squared_mask_audio)
-        audio = self.audio_encoders_norm(audio)
 
         # Add skip connections to text encoders
         for encoder in self.text_encoders:
             # , src_key_padding_mask=mask)
             text = text + encoder(text, mask=squared_mask_text)
-        text = self.text_encoders_norm(text)
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
