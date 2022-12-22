@@ -12,7 +12,7 @@ checkpoint:
 solver:
     loss_fn: CE
     balance_classes: False
-    lr: 5.0e-4
+    lr: 1.0e-4
     weight_decay: 5.0e-5
     epochs: 100
     scheduler:
@@ -25,15 +25,17 @@ solver:
         restore_best_weights: True
 
 model:
-    DROPOUT: 0.4
+    DROPOUT: 0.1
     AUDIO:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
-        N_LAYERS: 1
+        N_LAYERS: 2
+        N_ENCODERS: 2
     TEXT:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
-        N_LAYERS: 1
+        N_LAYERS: 2
+        N_ENCODERS: 2
     FAM:
         EMBEDDING_SIZE: 768
         N_HEAD: 8

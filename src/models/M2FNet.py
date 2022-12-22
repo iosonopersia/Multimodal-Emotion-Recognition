@@ -24,34 +24,43 @@ class M2FNet(nn.Module):
         super().__init__()
         self.config = config
         dropout = config.DROPOUT
+
         d_model_audio = config.AUDIO.EMBEDDING_SIZE
         d_model_text = config.TEXT.EMBEDDING_SIZE
         d_model_fam = config.FAM.EMBEDDING_SIZE
+
         self.n_head_audio = config.AUDIO.N_HEAD
         self.n_head_text = config.TEXT.N_HEAD
         self.n_head_fam = config.FAM.N_HEAD
-        self.n_layers_audio = config.AUDIO.N_LAYERS
-        self.n_layers_text = config.TEXT.N_LAYERS
+
+        n_layers_audio = config.AUDIO.N_LAYERS
+        n_layers_text = config.TEXT.N_LAYERS
+
+        n_encoders_audio = config.AUDIO.N_ENCODERS
+        n_encoders_text = config.TEXT.N_ENCODERS
+
         n_fam_layers = config.FAM.N_LAYERS
         n_layers_classifier = config.CLASSIFIER.N_LAYERS
         hidden_size_classifier = config.CLASSIFIER.HIDDEN_SIZE
         output_size = config.OUTPUT_SIZE
 
-        #Audio and text encoders
-        self.audio_encoder_layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
-        ] * self.n_layers_audio)
-        self.audio_encoder_norm = nn.LayerNorm(d_model_audio)
+        # Audio and text encoders
+        audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
+        self.audio_encoders = nn.ModuleList([
+            nn.TransformerEncoder(encoder_layer=audio_encoder_layer, num_layers=n_layers_audio)
+            for _ in range(n_encoders_audio)])
+        self.audio_encoders_norm = nn.LayerNorm(d_model_audio)
 
-        self.text_encoder_layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text, dropout=dropout)
-        ] * self.n_layers_text)
-        self.text_encoder_norm = nn.LayerNorm(d_model_text)
+        text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text, dropout=dropout)
+        self.text_encoders = nn.ModuleList([
+            nn.TransformerEncoder(encoder_layer=text_encoder_layer, num_layers=n_layers_text)
+            for _ in range(n_encoders_text)])
+        self.text_encoders_norm = nn.LayerNorm(d_model_text)
 
         # Fusion Attention layers
         self.fusion_layers = nn.ModuleList([
             FusionAttentionLayer(embedding_size=d_model_fam, n_head=self.n_head_fam, dropout=dropout)
-        ] * n_fam_layers)
+            for _ in range(n_fam_layers)])
 
         # Output layers
         classifier_head = [nn.Linear(d_model_text + d_model_audio, hidden_size_classifier)]
@@ -81,23 +90,26 @@ class M2FNet(nn.Module):
         squared_mask_fam = squared_mask.repeat(self.n_head_fam, 1, 1).float()
 
         # Add skip connections to audio encoders
-        for layer in self.audio_encoder_layers:
-            audio = audio + layer(audio, src_mask=squared_mask_audio)#, src_key_padding_mask=mask)
-        audio = self.audio_encoder_norm(audio)
+        for encoder in self.audio_encoders:
+            # , src_key_padding_mask=mask)
+            audio = audio + encoder(audio, mask=squared_mask_audio)
+        audio = self.audio_encoders_norm(audio)
 
         # Add skip connections to text encoders
-        for layer in self.text_encoder_layers:
-            text = text + layer(text, src_mask=squared_mask_text)#, src_key_padding_mask=mask)
-        text = self.text_encoder_norm(text)
+        for encoder in self.text_encoders:
+            # , src_key_padding_mask=mask)
+            text = text + encoder(text, mask=squared_mask_text)
+        text = self.text_encoders_norm(text)
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
 
         # Fusion layer
         for fusion_layer in self.fusion_layers:
-            text = fusion_layer(audio, text, mask=squared_mask_fam)#, src_key_padding_mask=mask)
+            # , src_key_padding_mask=mask)
+            text = fusion_layer(audio, text, mask=squared_mask_fam)
 
-        # concatenation layer
+        # Concatenation layer
         x = torch.cat((audio, text), dim=2)
 
         # Output layer
