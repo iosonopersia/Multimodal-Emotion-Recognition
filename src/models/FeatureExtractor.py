@@ -69,9 +69,9 @@ class FeatureExtractor(torch.nn.Module):
         batch_audio_features, _ = apply_padding(batch_audio_features)
 
         # Lengths to attention masks:
-        attention_mask = torch.zeros(batch_text_features.shape[0], batch_text_features.shape[1], dtype=torch.bool)
+        attention_mask = torch.ones(batch_text_features.shape[0], batch_text_features.shape[1],
+                                    dtype=torch.bool, device=batch_text_features.device)
         for i in range(batch_text_features.shape[0]):
-            attention_mask[i, :dialogue_lengths[i]] = True
-        attention_mask = attention_mask.to(batch_text_features.device)
+            attention_mask[i, :dialogue_lengths[i]] = False
 
         return batch_text_features, batch_audio_features, attention_mask

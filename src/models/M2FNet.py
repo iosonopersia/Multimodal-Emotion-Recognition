@@ -85,9 +85,9 @@ class M2FNet(nn.Module):
         # (batch_size, seq_len, seq_len)
         squared_mask = mask.unsqueeze(1).repeat(1, mask.shape[1], 1)
         squared_mask = squared_mask & squared_mask.transpose(1, 2)
-        squared_mask_text = squared_mask.repeat(self.n_head_text, 1, 1).float()
-        squared_mask_audio = squared_mask.repeat(self.n_head_audio, 1, 1).float()
-        squared_mask_fam = squared_mask.repeat(self.n_head_fam, 1, 1).float()
+        squared_mask_text = squared_mask.repeat(self.n_head_text, 1, 1)
+        squared_mask_audio = squared_mask.repeat(self.n_head_audio, 1, 1)
+        squared_mask_fam = squared_mask.repeat(self.n_head_fam, 1, 1)
 
         # Add skip connections to audio encoders
         for encoder in self.audio_encoders:
