@@ -65,7 +65,11 @@ def main(config=None):
     if config.wandb.enabled:
         os_start_method = 'spawn' if os.name == 'nt' else 'fork'
         run_datetime = datetime.now().isoformat().split('.')[0]
-        wandb.init(project=config.wandb.project_name, name=run_datetime, settings=wandb.Settings(start_method=os_start_method))
+        wandb.init(
+            project=config.wandb.project_name,
+            name=run_datetime,
+            config=config,
+            settings=wandb.Settings(start_method=os_start_method))
 
     #============SCHEDULER===============
     #------------------------------------
