@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class FusionAttention(nn.Module):
+class FusionAttentionLayer(nn.Module):
     def __init__(self, embedding_size, n_head, dropout):
         super().__init__()
         self.multihead_attention = nn.MultiheadAttention(embedding_size, n_head, batch_first=True, dropout=dropout)
@@ -17,6 +17,7 @@ class FusionAttention(nn.Module):
         x = self.relu(x)
         x = self.linear(x)
         return x
+
 
 class M2FNet(nn.Module):
     def __init__(self, config):
@@ -36,7 +37,7 @@ class M2FNet(nn.Module):
         hidden_size_classifier = config.CLASSIFIER.HIDDEN_SIZE
         output_size = config.OUTPUT_SIZE
 
-        #Audio and text encoders [Dialogue-level]
+        #Audio and text encoders
         self.audio_encoder_layers = nn.ModuleList([
             nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
         ] * self.n_layers_audio)
@@ -47,12 +48,12 @@ class M2FNet(nn.Module):
         ] * self.n_layers_text)
         self.text_encoder_norm = nn.LayerNorm(d_model_text)
 
-        # Fusion layer [Dialogue-level]
+        # Fusion Attention layers
         self.fusion_layers = nn.ModuleList([
-            FusionAttention(embedding_size=d_model_fam, n_head=self.n_head_fam, dropout=dropout)
+            FusionAttentionLayer(embedding_size=d_model_fam, n_head=self.n_head_fam, dropout=dropout)
         ] * n_fam_layers)
 
-        # Output layer [Dialogue-level]
+        # Output layers
         classifier_head = [nn.Linear(d_model_text + d_model_audio, hidden_size_classifier)]
         if n_layers_classifier > 2:
             for _ in range(n_layers_classifier - 2):
