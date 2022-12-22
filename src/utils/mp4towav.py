@@ -42,9 +42,9 @@ def convert_videos(mp4_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--train_path", type=str, default="data/MELD.raw/train_splits")
-    parser.add_argument("-b", "--dev_path", type=str, default="data/MELD.raw/dev_splits_complete")
-    parser.add_argument("-c", "--test_path", type=str, default="data/MELD.raw/output_repeated_splits_test")
+    parser.add_argument("-a", "--train_path", type=str, default="data/MELD.Raw/train_splits")
+    parser.add_argument("-b", "--dev_path", type=str, default="data/MELD.Raw/dev_splits_complete")
+    parser.add_argument("-c", "--test_path", type=str, default="data/MELD.Raw/output_repeated_splits_test")
     args = parser.parse_args()
 
     logging.basicConfig(filename="mp4towav_log.txt", filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
