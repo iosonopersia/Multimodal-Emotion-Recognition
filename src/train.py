@@ -215,6 +215,9 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
 
         #     tune.report(loss=orig_mre_loss)
 
+    if wandb_log:
+        wandb.finish()
+
     return {'loss_values': losses_values}
 
 def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch, wandb_log, device):
