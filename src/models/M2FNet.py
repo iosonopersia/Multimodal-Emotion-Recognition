@@ -16,6 +16,7 @@ class FusionAttentionLayer(nn.Module):
         x = torch.cat((x, text), dim=2)
         x = self.relu(x)
         x = self.linear(x)
+        x = self.relu(x)
         return x
 
 
