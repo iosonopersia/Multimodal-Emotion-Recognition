@@ -62,6 +62,10 @@ class Dataset(torch.utils.data.Dataset):
                 if (dialogue_id, utterance_id) in {(110, 7)}:
                     # This utterance video/audio is corrupted :-(
                     continue
+            elif self.mode == "test":
+                if (dialogue_id, utterance_id) in {(38,4),(220,0)}:
+                    # This utterance video/audio is corrupted :-(
+                    continue
 
             # Audio
             _wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{dialogue_id}_utt{utterance_id}.wav")
