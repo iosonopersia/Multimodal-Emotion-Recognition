@@ -229,7 +229,7 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
 
         sentiment = sentiment.to(device)
         emotion = emotion.to(device)
-
+        feature_embedding_model.eval()
         with torch.no_grad():
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
@@ -262,6 +262,7 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
     correct_pred = 0
     total_pred = 0
 
+    feature_embedding_model.eval()
     model.eval()
     with torch.inference_mode():
         for data in tqdm(dl_val, total=len(dl_val)):
