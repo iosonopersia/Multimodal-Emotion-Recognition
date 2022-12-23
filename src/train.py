@@ -49,8 +49,8 @@ def main(config=None):
     if criterion == "CE":
         if balance_classes:
             _, emotions = data_train.get_labels() # Use training data to compute class weights
-            class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=sorted(emotions.unique()), y=emotions.values)
-            class_weights = torch.tensor(class_weights, dtype=torch.float, device=device)
+            class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=[0, 1, 2, 3, 4, 5, 6], y=emotions)
+            class_weights = torch.as_tensor(class_weights, dtype=torch.float, device=device)
             criterion = torch.nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
         else:
             criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)

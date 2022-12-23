@@ -112,4 +112,4 @@ class Dataset(torch.utils.data.Dataset):
         return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
 
     def get_labels(self):
-        return self.text["Sentiment"], self.text["Emotion"]
+        return self.text["Sentiment"].to_numpy(), self.text["Emotion"].to_numpy()
