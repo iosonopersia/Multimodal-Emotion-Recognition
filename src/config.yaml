@@ -12,7 +12,7 @@ checkpoint:
 solver:
     loss_fn: CE
     balance_classes: False
-    lr: 1.0e-4
+    lr: 5.0e-4
     weight_decay: 5.0e-5
     epochs: 100
     scheduler:
