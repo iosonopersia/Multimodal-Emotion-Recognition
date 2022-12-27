@@ -4,7 +4,7 @@ AUDIO:
     wav2vec_sr: 16000
 
 checkpoint:
-    save_path: checkpoints/model.pth
+    save_folder: checkpoints
     load_path: checkpoints/model.pth
     save_checkpoint: True
     load_checkpoint: False

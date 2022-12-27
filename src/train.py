@@ -125,9 +125,14 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
     wandb_cfg = config.wandb
     wandb_log = wandb_cfg.enabled
 
+    #============CHECKPOINT===============
     checkpoint_cfg = config.checkpoint
     save_checkpoint = checkpoint_cfg.save_checkpoint
-    save_checkpoint_path = checkpoint_cfg.save_path
+    save_checkpoint_folder = checkpoint_cfg.save_folder
+    save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'checkpoint.pth')
+    os.makedirs(save_checkpoint_folder, exist_ok=True) # Create folder if it doesn't exist
+    for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
+        os.remove(os.path.join(save_checkpoint_folder, file))
 
     if wandb_log and wandb_cfg.watch_model:
         wandb.watch(
@@ -138,6 +143,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
             log_graph=False)
 
     if early_stopping:
+        best_weights_save_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'best_weights.pth')
         min_loss_val = float('inf')
         patience_counter = 0
 
@@ -190,18 +196,19 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
                         'epoch': epoch,
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
-                        }, save_checkpoint_path.rsplit("/", 1)[0]+"/best_weights.pth")
+                        }, best_weights_save_path)
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
                     print(f"Early stopping: patience {patience} reached")
                     if restore_best_weights:
-                        best_model = torch.load(save_checkpoint_path.rsplit("/", 1)[0]+"/best_weights.pth")
+                        best_model = torch.load(best_weights_save_path)
                         torch.save({
-                            'epoch': best_model["epoch"]+1,
+                            'epoch': best_model["epoch"] + 1,
                             'model_state_dict': best_model["model_state_dict"],
                             'optimizer_state_dict': best_model["optimizer_state_dict"],
                             }, save_checkpoint_path)
+                        os.remove(best_weights_save_path)
                         print(f"Best model at epoch {best_model['epoch']} restored")
                     break
 
