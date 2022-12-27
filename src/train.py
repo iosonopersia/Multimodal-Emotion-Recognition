@@ -9,6 +9,7 @@ from models.M2FNet import M2FNet
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.utils import class_weight
+from sklearn.metrics import accuracy_score, f1_score
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -266,8 +267,8 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
 
 def validate(model, feature_embedding_model, dl_val, criterion, device):
     loss_eval = 0
-    correct_pred = 0
-    total_pred = 0
+    accuracy = 0
+    weighted_f1 = 0
 
     feature_embedding_model.eval()
     model.eval()
@@ -287,15 +288,16 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
             loss = criterion(outputs.permute(0, 2, 1), emotion)
 
             # Calculate metrics
-            for i in range(outputs.shape[0]):
-                total_pred += (emotion[i] != -1).sum().item()
-                emotion_predicted = torch.argmax(outputs[[i]], dim=2)
-                emotion_true = emotion[[i]]
-                correct_pred += ((emotion_predicted == emotion_true) & (emotion_true != -1)).sum().item()
+            emotion_predicted = torch.argmax(outputs, dim=2)
+            mask = (emotion != -1)
+            emotion_predicted = emotion_predicted[mask].flatten().cpu().numpy()
+            emotion = emotion[mask].flatten().cpu().numpy()
+            accuracy += accuracy_score(emotion, emotion_predicted)
+            weighted_f1 += f1_score(emotion, emotion_predicted, average='weighted')
 
             loss_eval += loss.item()
 
-    return loss_eval / len(dl_val), correct_pred/total_pred
+    return loss_eval/len(dl_val), accuracy/len(dl_val), weighted_f1/len(dl_val)
 
 
 if __name__ == "__main__":
