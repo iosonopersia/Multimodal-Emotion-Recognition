@@ -1,14 +1,10 @@
 from genericpath import exists
-import os
 import torch
-import wandb
 from utils import get_config
 from datasets.dataset import Dataset
 from models.FeatureExtractor import FeatureExtractor
 from models.M2FNet import M2FNet
 from tqdm import tqdm
-from datetime import datetime
-from sklearn.utils import class_weight
 from sklearn.metrics import accuracy_score, f1_score
 
 # Suppress warnings from 'transformers' package
@@ -56,8 +52,6 @@ def main(config=None):
 
 
 def test(model, feature_embedding_model, dl_test, device):
-    correct_pred = 0
-    total_pred = 0
     accuracy = 0
     f1 = 0
     feature_embedding_model.eval()
