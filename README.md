@@ -34,7 +34,7 @@ Now, you need to download and prepare the dataset. Run the following commands fr
 
 ```bash
 # Linux
-> ./scripts/MELD_download. # Download dataset
+> ./scripts/MELD_download.sh # Download dataset
 > ./scripts/video2wav.sh # Extract audio
 
 # Windows
