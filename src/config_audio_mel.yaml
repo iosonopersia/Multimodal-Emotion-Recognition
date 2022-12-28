@@ -1,0 +1,56 @@
+DEBUG:
+  enabled: False
+  num_samples: 64
+
+AUDIO:
+    ffmpeg_sr: 16000
+    wav2vec_sr: 16000
+
+checkpoint:
+    save_path: checkpoints/audio_feature_extractor.pth
+    load_path: checkpoints/audio_feature_extractor.pth
+    save_checkpoint: True
+    load_checkpoint: False
+
+solver:
+    lr: 1.0e-5
+    weight_decay: 1.0e-3
+    epochs: 100
+    scheduler:
+        enabled: False
+        scheduler_fn: ExponentialLR
+        gamma: 0.98
+    early_stopping:
+        enabled: False
+        patience: 10
+        restore_best_weights: True
+
+model:
+
+train:
+    data_loader:
+        shuffle: True
+        batch_size: 32
+        num_workers: 1
+        pin_memory: True
+
+val:
+    data_loader:
+        shuffle: False
+        batch_size: 32
+        num_workers: 1
+        pin_memory: True
+
+test:
+    data_loader:
+        shuffle: False
+        batch_size: 1
+        num_workers: 1
+        pin_memory: True
+
+wandb:
+    enabled: False
+    watch_model: True
+    project_name: multimodal-emotion-recognition-audio-extractor
+
+...
