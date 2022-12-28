@@ -10,7 +10,7 @@ solver:
     num_frozen_epochs: 2
     frozen_lr: 1.0e-4
     finetuning_lr: 2.0e-6
-    weight_decay: 0.01 # 5.0e-5
+    weight_decay: 0.01
     epochs: 16
     early_stopping:
         enabled: True
