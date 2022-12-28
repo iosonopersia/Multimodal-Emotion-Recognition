@@ -164,6 +164,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
 
         if save_checkpoint:
             torch.save({
+                'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
             }, save_checkpoint_path)
 
@@ -184,6 +185,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
                 patience_counter = 0
                 if restore_best_weights:
                     torch.save({
+                        'epoch': epoch,
                         'model_state_dict': model.state_dict(),
                     }, best_weights_save_path)
             else:
@@ -193,6 +195,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
                     if restore_best_weights:
                         best_model = torch.load(best_weights_save_path)
                         torch.save({
+                            'epoch': best_model['epoch'] + 1,
                             'model_state_dict': best_model['model_state_dict'],
                         }, save_checkpoint_path)
                         os.remove(best_weights_save_path)
