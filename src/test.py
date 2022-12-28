@@ -58,15 +58,12 @@ def test(model, feature_embedding_model, dl_test, device):
     model.eval()
     with torch.inference_mode():
         for data in tqdm(dl_test, total=len(dl_test)):
-            text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
+            text, audio, emotion = data["text"], data["audio"], data["emotion"]
+            emotion = emotion.to(device)
 
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
-
             text, audio, mask = feature_embedding_model(text, audio)
-
-            sentiment = sentiment.to(device)
-            emotion = emotion.to(device)
 
             outputs = model(text, audio, mask)
             emotion_predicted = torch.argmax(outputs, dim=2)

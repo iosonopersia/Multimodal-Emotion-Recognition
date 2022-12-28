@@ -49,7 +49,7 @@ def main(config=None):
     balance_classes = config.solver.balance_classes
     if criterion == "CE":
         if balance_classes:
-            _, emotions = data_train.get_labels() # Use training data to compute class weights
+            emotions = data_train.get_labels() # Use training data to compute class weights
             class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=[0, 1, 2, 3, 4, 5, 6], y=emotions)
             class_weights = torch.as_tensor(class_weights, dtype=torch.float, device=device)
             criterion = torch.nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
@@ -133,7 +133,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
     save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'checkpoint.pth')
     os.makedirs(save_checkpoint_folder, exist_ok=True) # Create folder if it doesn't exist
     for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
-        os.remove(os.path.join(save_checkpoint_folder, file))
+                os.remove(os.path.join(save_checkpoint_folder, file))
 
     if wandb_log and wandb_cfg.watch_model:
         wandb.watch(
@@ -233,10 +233,9 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
 
     model.train()
     for idx_batch, data in tqdm(enumerate(dl_train), total=len(dl_train)):
-        text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
-
-        sentiment = sentiment.to(device)
+        text, audio, emotion = data["text"], data["audio"], data["emotion"]
         emotion = emotion.to(device)
+
         feature_embedding_model.eval()
         with torch.no_grad():
             text = [t.to(device) for t in text]
@@ -274,15 +273,12 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
     model.eval()
     with torch.inference_mode():
         for data in tqdm(dl_val, total=len(dl_val)):
-            text, audio, sentiment, emotion = data["text"], data["audio"], data["sentiment"], data["emotion"]
+            text, audio, emotion = data["text"], data["audio"], data["emotion"]
+            emotion = emotion.to(device)
 
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
-
             text, audio, mask = feature_embedding_model(text, audio)
-
-            sentiment = sentiment.to(device)
-            emotion = emotion.to(device)
 
             outputs = model(text, audio, mask)
             loss = criterion(outputs.permute(0, 2, 1), emotion)

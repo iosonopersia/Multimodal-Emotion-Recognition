@@ -28,10 +28,6 @@ class Dataset(torch.utils.data.Dataset):
         self.text = get_text(mode)
 
         # Map labels to class indices
-        sentiment_labels = {"neutral": 0, "negative": 1, "positive": 2}
-        self.text["Sentiment"] = self.text["Sentiment"].map(sentiment_labels)
-
-        # Map labels to class indices
         emotion_labels = {"neutral": 0, "joy": 1, "sadness": 2, "anger": 3, "surprise": 4, "fear": 5, "disgust": 6}
         self.text["Emotion"] = self.text["Emotion"].map(emotion_labels)
 
@@ -49,7 +45,6 @@ class Dataset(torch.utils.data.Dataset):
 
         text = []
         audio = []
-        sentiment = []
         emotion = []
         for _, utterance in utterances.iterrows():
             utterance_id = utterance["Utterance_ID"]
@@ -74,17 +69,12 @@ class Dataset(torch.utils.data.Dataset):
             # Text
             _text = utterance["Utterance"]
 
-            # Sentiment
-            _sentiment = utterance["Sentiment"]
-            _sentiment = torch.tensor([_sentiment])
-
             # Emotion
             _emotion = utterance["Emotion"]
             _emotion = torch.tensor([_emotion])
 
             audio.append(_audio)
             text.append(_text)
-            sentiment.append(_sentiment)
             emotion.append(_emotion)
 
         # Tokenize text
@@ -94,7 +84,7 @@ class Dataset(torch.utils.data.Dataset):
         if self.wav2vec_sr != self.ffmpeg_sr:
             audio = [torchaudio.functional.resample(a, self.ffmpeg_sr, self.wav2vec_sr) for a in audio]
 
-        return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
+        return {"text": text, "audio": audio, "emotion": emotion}
 
     def my_collate_fn(self, batch):
         # text
@@ -103,17 +93,12 @@ class Dataset(torch.utils.data.Dataset):
         # audio
         audio = [d["audio"] for d in batch]
 
-        # sentiment
-        sentiment = [torch.stack(d["sentiment"], dim=0).unsqueeze(dim=0) for d in batch]
-        sentiment, _ = apply_padding(sentiment, padding_value=-1) # -1 class index is ignored during loss computation
-        sentiment = sentiment.squeeze(dim=2)
-
         # emotion
         emotion = [torch.stack(d["emotion"], dim=0).unsqueeze(dim=0) for d in batch]
         emotion, _ = apply_padding(emotion, padding_value=-1) # -1 class index is ignored during loss computation
         emotion = emotion.squeeze(dim=2)
 
-        return {"text": text, "audio": audio, "sentiment": sentiment, "emotion": emotion}
+        return {"text": text, "audio": audio, "emotion": emotion}
 
     def get_labels(self):
-        return self.text["Sentiment"].to_numpy(), self.text["Emotion"].to_numpy()
+        return self.text["Emotion"].to_numpy()
