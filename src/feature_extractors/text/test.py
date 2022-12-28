@@ -3,7 +3,7 @@ import os
 import torch
 from utils import get_config
 from dataset import Dataset
-from models.FeatureExtractor import TextERC
+from models import TextERC
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score
 
