@@ -180,12 +180,16 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
         if use_scheduler:
             lr_scheduler.step()
 
-        print(f'Epoch: {epoch} '
-              f' Lr: {lr:.8f} '
-              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3f}%] - weighted_f1 = [{weighted_f1 * 100:.3f}]')
+        print(f'Epoch: {epoch} lr: {lr:.3E} Train=[{loss_train:.3E}] Val=[{loss_val:.3E}] Accuracy=[{accuracy * 100:.3f}%] Weighted_F1=[{weighted_f1 * 100:.3f}%]')
 
         if wandb_log:
-            wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy, 'weighted_f1': weighted_f1})
+            wandb.log({
+                'Params/Epoch': epoch,
+                'Params/Learning_Rate': lr,
+                'Train/Loss': loss_train,
+                'Validation/Loss': loss_val,
+                'Validation/Accuracy': accuracy,
+                'Validation/Weighted_F1': weighted_f1})
 
         # Early stopping
         if early_stopping:
@@ -260,7 +264,9 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
         if wandb_log:
             running_loss = loss_train / (idx_batch + 1)
             global_step = epoch * len(dl_train) + idx_batch
-            wandb.log({'Train_loss': running_loss, 'Global_step': global_step})
+            wandb.log({
+                'Train/Running_loss': running_loss,
+                'Params/Global_step': global_step})
 
     return loss_train / len(dl_train)
 
