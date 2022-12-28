@@ -5,7 +5,7 @@ AUDIO:
 
 checkpoint:
     save_folder: checkpoints
-    load_path: checkpoints/model.pth
+    load_path: checkpoints/m2fnet.pth
     save_checkpoint: True
     load_checkpoint: False
 

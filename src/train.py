@@ -40,7 +40,13 @@ def main(config=None):
 
     #============MODEL===============
     #--------------------------------
-    feature_embedding_model = FeatureExtractor().to(device)
+    roberta_checkpoint_folder = os.path.join(os.path.abspath(config.checkpoint.save_folder), 'finetuned_roBERTa', 'roberta')
+
+    if (exists(roberta_checkpoint_folder)):
+        feature_extractor = FeatureExtractor(roberta_checkpoint=roberta_checkpoint_folder).to(device)
+    else:
+        print("Fine-tuned RoBERTa checkpoint not found. Using 'roberta-base'.")
+        feature_extractor = FeatureExtractor().to(device)
     model = M2FNet(config.model).to(device)
 
     #============CRITERION===============
@@ -98,7 +104,7 @@ def main(config=None):
     print("Training...")
     training_loop(
         model,
-        feature_embedding_model,
+        feature_extractor,
         dl_train,
         dl_val,
         criterion,
@@ -112,7 +118,7 @@ def main(config=None):
     print("Training complete")
 
 
-def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
+def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -130,9 +136,10 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
     checkpoint_cfg = config.checkpoint
     save_checkpoint = checkpoint_cfg.save_checkpoint
     save_checkpoint_folder = checkpoint_cfg.save_folder
-    save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'checkpoint.pth')
+    save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'm2fnet.pth')
     os.makedirs(save_checkpoint_folder, exist_ok=True) # Create folder if it doesn't exist
     for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
+        if os.path.isfile(file):
                 os.remove(os.path.join(save_checkpoint_folder, file))
 
     if wandb_log and wandb_cfg.watch_model:
@@ -151,7 +158,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
     for epoch in range(start_epoch, epochs):
         loss_train = train(
             model,
-            feature_embedding_model,
+            feature_extractor,
             dl_train,
             criterion,
             optimizer,
@@ -162,14 +169,13 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
 
         loss_val, accuracy, weighted_f1 = validate(
             model,
-            feature_embedding_model,
+            feature_extractor,
             dl_val,
             criterion,
             device)
         val_losses_values.append(loss_val)
 
         if save_checkpoint:
-            os.makedirs(save_checkpoint_path.rsplit("/", 1)[0], exist_ok=True)
             torch.save({
             'epoch': epoch+1,
             'model_state_dict': model.state_dict(),
@@ -232,7 +238,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
 
     return {'loss_values': losses_values}
 
-def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch, wandb_log, device):
+def train(model, feature_extractor, dl_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
 
     model.train()
@@ -240,12 +246,12 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
         text, audio, emotion = data["text"], data["audio"], data["emotion"]
         emotion = emotion.to(device)
 
-        feature_embedding_model.eval()
+        feature_extractor.eval()
         with torch.no_grad():
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
 
-            text, audio, mask = feature_embedding_model(text, audio)
+            text, audio, mask = feature_extractor(text, audio)
 
         # Start recording gradients from here
         text.requires_grad_(True)
@@ -270,12 +276,12 @@ def train(model, feature_embedding_model, dl_train, criterion, optimizer, epoch,
 
     return loss_train / len(dl_train)
 
-def validate(model, feature_embedding_model, dl_val, criterion, device):
+def validate(model, feature_extractor, dl_val, criterion, device):
     loss_eval = 0
     accuracy = 0
     weighted_f1 = 0
 
-    feature_embedding_model.eval()
+    feature_extractor.eval()
     model.eval()
     with torch.inference_mode():
         for data in tqdm(dl_val, total=len(dl_val)):
@@ -284,7 +290,7 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
 
             text = [t.to(device) for t in text]
             audio = [[aa.to(device) for aa in a] for a in audio]
-            text, audio, mask = feature_embedding_model(text, audio)
+            text, audio, mask = feature_extractor(text, audio)
 
             outputs = model(text, audio, mask)
             loss = criterion(outputs.permute(0, 2, 1), emotion)
