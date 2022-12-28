@@ -160,7 +160,7 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
             device)
         losses_values.append(loss_train)
 
-        loss_val, accuracy = validate(
+        loss_val, accuracy, weighted_f1 = validate(
             model,
             feature_embedding_model,
             dl_val,
@@ -182,10 +182,10 @@ def training_loop(model, feature_embedding_model, dl_train, dl_val, criterion, o
 
         print(f'Epoch: {epoch} '
               f' Lr: {lr:.8f} '
-              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3f}%]')
+              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3f}%] - weighted_f1 = [{weighted_f1 * 100:.3f}]')
 
         if wandb_log:
-            wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy})
+            wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy, 'weighted_f1': weighted_f1})
 
         # Early stopping
         if early_stopping:
