@@ -138,9 +138,9 @@ def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimiz
     save_checkpoint_folder = checkpoint_cfg.save_folder
     save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'm2fnet.pth')
     os.makedirs(save_checkpoint_folder, exist_ok=True) # Create folder if it doesn't exist
-    for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
-        if os.path.isfile(file):
-                os.remove(os.path.join(save_checkpoint_folder, file))
+    # for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
+    #     if os.path.isfile(file):
+    #             os.remove(os.path.join(save_checkpoint_folder, file))
 
     if wandb_log and wandb_cfg.watch_model:
         wandb.watch(
