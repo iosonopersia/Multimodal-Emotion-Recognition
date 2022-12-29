@@ -8,6 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 from sklearn.utils import class_weight
 from munch import Munch
+from losses.AdaptiveTripletMarginLoss import AdaptiveTripletMarginLoss
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -45,7 +46,10 @@ def main(config=None):
     #------------------------------------
 
     #triplet loss
-    criterion = torch.nn.TripletMarginLoss(margin=1.0, p=2)
+    if config.solver.adaptive_triplet_margin_loss.enabled:
+        criterion = AdaptiveTripletMarginLoss()
+    else:
+        criterion = torch.nn.TripletMarginLoss(margin=1.0, p=2)
 
     #============OPTIMIZER===============
     #------------------------------------

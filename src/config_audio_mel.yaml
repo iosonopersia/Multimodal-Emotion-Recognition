@@ -13,6 +13,8 @@ checkpoint:
     load_checkpoint: False
 
 solver:
+    adaptive_triplet_margin_loss:
+        enabled: False
     lr: 1.0e-5
     weight_decay: 1.0e-3
     epochs: 100
