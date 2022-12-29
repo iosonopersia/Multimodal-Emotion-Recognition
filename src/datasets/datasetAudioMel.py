@@ -100,7 +100,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
         '''
         # take last part of the audio_path
-        audio_path_cache = audio_path.split("/")[-1]
+        audio_path_cache = os.path.split(audio_path)[-1]
         # remove extension
         audio_path_cache = audio_path_cache.split(".")[0]
         audio_path_cache = os.path.join(self.mel_spectogram_cache, f"{audio_path_cache}.png")
