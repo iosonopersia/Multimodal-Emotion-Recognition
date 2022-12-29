@@ -34,9 +34,12 @@ class TestAudioExtractor(nn.Module):
             param.requires_grad = False
 
         self.classifier = nn.Sequential(
-            nn.Linear(768, 7),
-            nn.Softmax()
+            nn.ReLU(),
+            nn.Linear(768, 256),
+            nn.ReLU(),
+            nn.Linear(256, 7)
         )
+
     def forward(self, x):
         x = self.audio_extractor(x)
         x = self.classifier(x)
