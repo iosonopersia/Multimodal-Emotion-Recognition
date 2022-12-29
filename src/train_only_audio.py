@@ -138,7 +138,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, s
             device)
         losses_values.append(loss_train)
 
-        loss_val, accuracy = validate(
+        loss_val, accuracy, weighted_f1 = validate(
             model,
             dl_val,
             criterion,
@@ -159,10 +159,10 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, s
 
         print(f'Epoch: {epoch} '
               f' Lr: {lr:.8f} '
-              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3f}%]')
+              f' Loss: Train = [{loss_train:.3E}] - Val = [{loss_val:.3E}] - accuracy = [{accuracy * 100:.3f}%] - weighted_f1 = [{weighted_f1 * 100:.3f}%]')
 
         if wandb_log:
-            wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy})
+            wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy, 'weighted_f1': weighted_f1})
 
 
         # Hyperparameter search
@@ -192,7 +192,7 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
         optimizer.zero_grad()
         # outputs = model(text, audio, mask)
         outputs = model(audio)
-        loss = criterion(outputs, emotion)
+        loss = criterion(outputs, emotion.squeeze())
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
@@ -206,12 +206,11 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
 
     return loss_train / len(dl_train)
 
-def validate(model, feature_embedding_model, dl_val, criterion, device):
+def validate(model, dl_val, criterion, device):
     loss_eval = 0
     accuracy = 0
     weighted_f1 = 0
 
-    feature_embedding_model.eval()
     model.eval()
     with torch.inference_mode():
         for data in tqdm(dl_val, total=len(dl_val)):
@@ -219,15 +218,15 @@ def validate(model, feature_embedding_model, dl_val, criterion, device):
 
             # outputs = model(text, audio, mask)
             outputs = model(audio)
-            loss = criterion(outputs, emotion)
+            loss = criterion(outputs, emotion.squeeze())
 
             # Calculate metrics
-            emotion_predicted = torch.argmax(outputs, dim=2)
-            mask = (emotion != -1)
-            emotion_predicted = emotion_predicted[mask].flatten().cpu().numpy()
-            emotion = emotion[mask].flatten().cpu().numpy()
-            accuracy += accuracy_score(emotion, emotion_predicted)
-            weighted_f1 += f1_score(emotion, emotion_predicted, average='weighted')
+            emotion_predicted = torch.argmax(outputs, dim=1)
+            # mask = (emotion != -1)
+            # emotion_predicted = emotion_predicted[mask].flatten().cpu().numpy()
+            # emotion = emotion[mask].flatten().cpu().numpy()
+            accuracy += accuracy_score(emotion.squeeze().cpu().numpy(), emotion_predicted.cpu().numpy())
+            weighted_f1 += f1_score(emotion.squeeze().cpu().numpy(), emotion_predicted.cpu().numpy(), average='weighted')
 
             loss_eval += loss.item()
 
