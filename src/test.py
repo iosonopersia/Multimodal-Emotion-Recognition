@@ -1,4 +1,4 @@
-from genericpath import exists
+import os
 import torch
 from utils import get_config
 from datasets.dataset import Dataset
@@ -37,7 +37,7 @@ def main(config=None):
     #--------------------------------
     load_checkpoint_path = config.checkpoint.load_path
 
-    if (exists(load_checkpoint_path)):
+    if (os.path.exists(load_checkpoint_path)):
         checkpoint = torch.load(load_checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
     else:

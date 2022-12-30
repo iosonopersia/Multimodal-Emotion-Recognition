@@ -1,4 +1,3 @@
-from genericpath import exists
 import os
 import torch
 from utils import get_config
@@ -36,7 +35,7 @@ def main(config=None):
     #--------------------------------
     load_checkpoint_path = os.path.join(os.path.abspath(config.checkpoint.save_folder), 'checkpoint.pth')
 
-    if (exists(load_checkpoint_path)):
+    if (os.path.exists(load_checkpoint_path)):
         checkpoint = torch.load(load_checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
     else:

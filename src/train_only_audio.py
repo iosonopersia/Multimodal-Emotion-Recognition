@@ -1,4 +1,3 @@
-from genericpath import exists
 import os
 import torch
 import wandb
@@ -74,7 +73,7 @@ def main(config=None):
     load_checkpoint = config.checkpoint.load_checkpoint
     load_checkpoint_path = config.checkpoint.load_path
 
-    if (load_checkpoint and exists(load_checkpoint_path)):
+    if (load_checkpoint and os.path.exists(load_checkpoint_path)):
         checkpoint = torch.load(load_checkpoint_path)
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model_state_dict'])
