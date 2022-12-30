@@ -44,3 +44,36 @@ def get_text (mode="train"):
         df["Utterance"] = df["Utterance"].map(lambda x: x.replace(key, value))
 
     return df
+
+def get_utterance_with_context(df, idx, separator):
+    main_utterance_row = df.iloc[idx]
+    dialogue_id = int(main_utterance_row["Dialogue_ID"])
+    main_utterance_id = int(main_utterance_row["Utterance_ID"])
+
+    dialogue = df[df["Dialogue_ID"] == dialogue_id]
+    dia_utt_ids = sorted(dialogue["Utterance_ID"].to_list())
+    try:
+        main_utt_idx_in_dialogue = dia_utt_ids.index(main_utterance_id)
+    except ValueError:
+        raise ValueError(f"Utterance ID {main_utterance_id} not found in dialogue ID {dialogue_id}")
+    prev_utterance_id = dia_utt_ids[main_utt_idx_in_dialogue - 1] if main_utt_idx_in_dialogue > 0 else None
+    next_utterance_id = dia_utt_ids[main_utt_idx_in_dialogue + 1] if main_utt_idx_in_dialogue < len(dia_utt_ids) - 1 else None
+
+    # Concatenate the previous and next utterances
+    utterance_with_context = main_utterance_row["Utterance"]
+
+    if prev_utterance_id is not None:
+        prev_utterance_row = dialogue[dialogue["Utterance_ID"] == prev_utterance_id].iloc[0]
+        prev_utterance = prev_utterance_row["Utterance"]
+        utterance_with_context = f"{prev_utterance} {separator} {utterance_with_context}"
+    else:
+        utterance_with_context = f"{separator} {utterance_with_context}"
+
+    if next_utterance_id is not None:
+        next_utterance_row = dialogue[dialogue["Utterance_ID"] == next_utterance_id].iloc[0]
+        next_utterance = next_utterance_row["Utterance"]
+        utterance_with_context = f"{utterance_with_context} {separator} {next_utterance}"
+    else:
+        utterance_with_context = f"{utterance_with_context} {separator}"
+
+    return utterance_with_context

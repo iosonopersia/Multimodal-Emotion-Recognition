@@ -1,5 +1,5 @@
 import torch
-from utils import get_text
+from utils import get_text, get_utterance_with_context
 from transformers import RobertaTokenizer
 
 
@@ -25,36 +25,14 @@ class Dataset(torch.utils.data.Dataset):
         return self.dataset_size
 
     def __getitem__(self, idx):
-        main_utterance = self.text.iloc[idx]
-        dialogue_id = int(main_utterance["Dialogue_ID"])
-        main_utterance_id = int(main_utterance["Utterance_ID"])
-
-        # Get the previous and next utterance IDs
-        dialogue = self.text[self.text["Dialogue_ID"] == dialogue_id]
-        dia_utt_ids = sorted(dialogue["Utterance_ID"].to_list())
-        try:
-            main_utt_pos_in_dialogue = dia_utt_ids.index(main_utterance_id)
-        except ValueError:
-            raise ValueError(f"Utterance ID {main_utterance_id} not found in dialogue ID {dialogue_id}")
-        prev_utterance_id = dia_utt_ids[main_utt_pos_in_dialogue - 1] if main_utt_pos_in_dialogue > 0 else None
-        next_utterance_id = dia_utt_ids[main_utt_pos_in_dialogue + 1] if main_utt_pos_in_dialogue < len(dia_utt_ids) - 1 else None
-
-        # Concatenate the previous and next utterances
-        utterances = [' ', main_utterance["Utterance"], ' ']
-        if prev_utterance_id is not None:
-            prev_utterance_row = dialogue[dialogue["Utterance_ID"] == prev_utterance_id].iloc[0]
-            utterances[0] = prev_utterance_row["Utterance"]
-
-        if next_utterance_id is not None:
-            next_utterance_row = dialogue[dialogue["Utterance_ID"] == next_utterance_id].iloc[0]
-            utterances[2] = next_utterance_row["Utterance"]
+        df_row = self.text.iloc[idx]
 
         # Text
-        separator = f" {self.roberta_tokenizer.sep_token} "
-        text = separator.join(utterances)
+        separator = self.roberta_tokenizer.sep_token
+        text = get_utterance_with_context(self.text, idx, separator)
 
         # Emotion
-        emotion = int(main_utterance["Emotion"])
+        emotion = int(df_row["Emotion"])
 
         return {"text": text, "emotion": emotion}
 

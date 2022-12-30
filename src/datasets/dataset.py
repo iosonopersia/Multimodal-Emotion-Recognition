@@ -1,7 +1,6 @@
 import torch
-from models.FeatureExtractor import FeatureExtractor
 from utils import get_config, apply_padding
-from utils.dataset_utils import get_text
+from utils.dataset_utils import get_text, get_utterance_with_context
 import os
 import torchaudio
 from transformers import RobertaTokenizer
@@ -15,7 +14,7 @@ class Dataset(torch.utils.data.Dataset):
         self.ffmpeg_sr = config.AUDIO.ffmpeg_sr
         self.wav2vec_sr = config.AUDIO.wav2vec_sr
 
-        self.roberta_encoder = RobertaTokenizer.from_pretrained('roberta-base')
+        self.roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
 
         self.mode = mode
         if self.mode == "train":
@@ -67,7 +66,12 @@ class Dataset(torch.utils.data.Dataset):
             _audio, _ = torchaudio.load(_wav_path, format="wav")
 
             # Text
-            _text = utterance["Utterance"]
+            current_row_mask = (self.text["Dialogue_ID"] == dialogue_id) & (self.text["Utterance_ID"] == utterance_id)
+            assert len(self.text[current_row_mask].index) == 1
+            df_row_idx = self.text[current_row_mask].index[0]
+
+            separator = self.roberta_tokenizer.sep_token
+            _text = get_utterance_with_context(self.text, df_row_idx, separator)
 
             # Emotion
             _emotion = utterance["Emotion"]
@@ -78,7 +82,7 @@ class Dataset(torch.utils.data.Dataset):
             emotion.append(_emotion)
 
         # Tokenize text
-        text = self.roberta_encoder(text, return_tensors="pt", padding="longest")
+        text = self.roberta_tokenizer(text, return_tensors="pt", padding="longest")
 
         # Resample to 16kHz for wav2vec2
         if self.wav2vec_sr != self.ffmpeg_sr:
