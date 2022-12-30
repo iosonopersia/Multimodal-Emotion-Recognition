@@ -1,7 +1,11 @@
 ---
 checkpoint:
-    save_folder: checkpoints/finetuned_roBERTa
+    save_path: checkpoints/text/checkpoint.pth
     save_checkpoint: True
+
+save_pretrained:
+    enabled: True
+    path: checkpoints/text/roberta-base
 
 solver:
     loss_fn: CE

@@ -1,4 +1,3 @@
-from genericpath import exists
 import os
 import torch
 import wandb
@@ -40,9 +39,9 @@ def main(config=None):
 
     #============MODEL===============
     #--------------------------------
-    roberta_checkpoint_folder = os.path.join(os.path.abspath(config.checkpoint.save_folder), 'finetuned_roBERTa', 'roberta')
+    roberta_checkpoint_folder = os.path.abspath(config.feature_extractors.text.checkpoint)
 
-    if (exists(roberta_checkpoint_folder)):
+    if (os.path.exists(roberta_checkpoint_folder)):
         feature_extractor = FeatureExtractor(roberta_checkpoint=roberta_checkpoint_folder).to(device)
     else:
         print("Fine-tuned RoBERTa checkpoint not found. Using 'roberta-base'.")
@@ -91,9 +90,9 @@ def main(config=None):
     #--------------------------------
     start_epoch = 0
     load_checkpoint = config.checkpoint.load_checkpoint
-    load_checkpoint_path = config.checkpoint.load_path
+    load_checkpoint_path = os.path.abspath(config.checkpoint.load_path)
 
-    if (load_checkpoint and exists(load_checkpoint_path)):
+    if (load_checkpoint and os.path.exists(load_checkpoint_path)):
         checkpoint = torch.load(load_checkpoint_path)
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model_state_dict'])
@@ -135,12 +134,8 @@ def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimiz
     #============CHECKPOINT===============
     checkpoint_cfg = config.checkpoint
     save_checkpoint = checkpoint_cfg.save_checkpoint
-    save_checkpoint_folder = checkpoint_cfg.save_folder
-    save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'm2fnet.pth')
-    os.makedirs(save_checkpoint_folder, exist_ok=True) # Create folder if it doesn't exist
-    # for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
-    #     if os.path.isfile(file):
-    #             os.remove(os.path.join(save_checkpoint_folder, file))
+    save_checkpoint_path = os.path.abspath(checkpoint_cfg.save_path)
+    os.makedirs(os.path.dirname(save_checkpoint_path), exist_ok=True) # Create folder if it doesn't exist
 
     if wandb_log and wandb_cfg.watch_model:
         wandb.watch(
@@ -151,7 +146,7 @@ def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimiz
             log_graph=False)
 
     if early_stopping:
-        best_weights_save_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'best_weights.pth')
+        best_weights_save_path = os.path.join(os.path.dirname(save_checkpoint_path), f'best_weights.pth')
         min_loss_val = float('inf')
         patience_counter = 0
 

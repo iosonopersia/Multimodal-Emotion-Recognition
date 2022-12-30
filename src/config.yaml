@@ -3,8 +3,16 @@ AUDIO:
     ffmpeg_sr: 16000
     wav2vec_sr: 16000
 
+feature_extractors:
+    text:
+        checkpoint: checkpoints/text/roberta-base # Alternatively, 'roberta-base'
+    audio_MEL:
+        checkpoint: checkpoints/audio_MEL/resnet18-mel # Alternatively, 'facebook/wav2vec2-base-960h'
+    audio_wav2vec:
+        checkpoint: checkpoints/audio_wav2vec/wav2vec # Alternatively, 'facebook/wav2vec2-base-960h'
+
 checkpoint:
-    save_folder: checkpoints
+    save_path: checkpoints/m2fnet.pth
     load_path: checkpoints/m2fnet.pth
     save_checkpoint: True
     load_checkpoint: False
@@ -25,17 +33,17 @@ solver:
         restore_best_weights: True
 
 model:
-    DROPOUT: 0.1
+    DROPOUT: 0.4
     AUDIO:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
-        N_LAYERS: 2
-        N_ENCODERS: 2
+        N_LAYERS: 1
+        N_ENCODERS: 1
     TEXT:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
-        N_LAYERS: 2
-        N_ENCODERS: 2
+        N_LAYERS: 1
+        N_ENCODERS: 1
     FAM:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
@@ -67,7 +75,7 @@ test:
         pin_memory: True
 
 wandb:
-    enabled: False
+    enabled: True
     watch_model: False
     project_name: multimodal-emotion-recognition
 

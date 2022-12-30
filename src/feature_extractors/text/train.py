@@ -114,12 +114,8 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
     #============CHECKPOINT===============
     checkpoint_cfg = config.checkpoint
     save_checkpoint = checkpoint_cfg.save_checkpoint
-    save_checkpoint_folder = checkpoint_cfg.save_folder
-    save_checkpoint_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'checkpoint.pth')
-    os.makedirs(save_checkpoint_folder, exist_ok=True) # Create folder if it doesn't exist
-    for file in os.listdir(save_checkpoint_folder): # Delete all files in folder
-        if os.path.isfile(file):
-            os.remove(os.path.join(save_checkpoint_folder, file))
+    save_checkpoint_path = os.path.abspath(checkpoint_cfg.save_path)
+    os.makedirs(os.path.dirname(save_checkpoint_path), exist_ok=True) # Create folder if it doesn't exist
 
     if wandb_log and wandb_cfg.watch_model:
         wandb.watch(
@@ -130,7 +126,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
             log_graph=False)
 
     if early_stopping:
-        best_weights_save_path = os.path.join(os.path.abspath(save_checkpoint_folder), f'best_weights.pth')
+        best_weights_save_path = os.path.join(os.path.dirname(save_checkpoint_path), f'best_weights.pth')
         min_loss_val = float('inf')
         patience_counter = 0
 
@@ -206,9 +202,15 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
         wandb.finish()
 
     # Save fine-tuned RoBERTa model:
-    print(f"Saving checkpoint of fine-tuned RoBERTa model..")
-    roberta_checkpoint_folder = os.path.join(os.path.abspath(save_checkpoint_folder), 'roberta')
-    model.roberta.save_pretrained(roberta_checkpoint_folder)
+    if config.save_pretrained.enabled:
+        roberta_checkpoint_folder = os.path.abspath(config.save_pretrained.path)
+        if early_stopping and restore_best_weights:
+            print(f"Saving BEST checkpoint of fine-tuned RoBERTa model...")
+        else:
+            print(f"Saving LAST checkpoint of fine-tuned RoBERTa model...")
+        model_params = torch.load(save_checkpoint_path)
+        model.load_state_dict(model_params['model_state_dict'])
+        model.roberta.save_pretrained(roberta_checkpoint_folder)
 
     return {'loss_values': losses_values}
 
