@@ -1,13 +1,15 @@
 import os
 import torch
 import wandb
-from datasets.datasetAudioMel import DatasetMelAudio as Dataset
-from models.AudioMelFeatureExtractor import AudioMelFeatureExtractor
+from datasetAudioMel import DatasetMelAudio as Dataset
+from AudioMelFeatureExtractor import AudioMelFeatureExtractor
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.utils import class_weight
 from munch import Munch
 from losses.AdaptiveTripletMarginLoss import AdaptiveTripletMarginLoss
+from losses.VarianceLoss import VarianceLoss
+from losses.CovarianceLoss import CovarianceLoss
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -16,7 +18,7 @@ logging.set_verbosity_error()
 
 def main(config=None):
     #CONFIG
-    with open('./src/config_audio_mel.yaml', 'rt', encoding='utf-8') as f:
+    with open('./src/feature_extractors/audio_mel/config_audio_mel.yaml', 'rt', encoding='utf-8') as f:
         config = Munch.fromYAML(f.read())
 
     #============DEVICE===============
@@ -46,7 +48,7 @@ def main(config=None):
 
     #triplet loss
     if config.solver.adaptive_triplet_margin_loss.enabled:
-        criterion = AdaptiveTripletMarginLoss()
+        criterion = {"adaptive":AdaptiveTripletMarginLoss(), "variance":VarianceLoss(), "covariance":CovarianceLoss()}
     else:
         criterion = torch.nn.TripletMarginLoss(margin=1.0, p=2)
 
@@ -204,20 +206,24 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
     batch_size = data_train.config.train.data_loader.batch_size
     n_steps = len(data_train) // batch_size
-    model.train()
     for idx_batch in tqdm(range(n_steps), "Training epoch {}".format(epoch)):
         with torch.inference_mode():
             data = data_train.get_batched_triplets(batch_size, model)
 
+        model.train()
         anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
 
         # Feature extractor
         optimizer.zero_grad()
-
         anchor_embedding = model(anchor)
         positive_embedding = model(positive)
         negative_embedding = model(negative)
-        loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
+        loss = 20* criterion["adaptive"](anchor_embedding, positive_embedding, negative_embedding) + \
+                5 * criterion["covariance"](anchor_embedding, positive_embedding, negative_embedding) + \
+                1 * criterion ["variance"](anchor_embedding, positive_embedding, negative_embedding)
+        # loss = criterion["variance"](anchor_embedding, positive_embedding, negative_embedding)
+
+
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
@@ -246,7 +252,11 @@ def validate(model, data_val, criterion, device):
             positive_embedding = model(positive)
             negative_embedding = model(negative)
 
-            loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
+            loss = 20 * criterion["adaptive"](anchor_embedding, positive_embedding, negative_embedding) + \
+                    5 * criterion["covariance"](anchor_embedding, positive_embedding, negative_embedding) + \
+                criterion ["variance"](anchor_embedding, positive_embedding, negative_embedding)
+
+            # loss = criterion["adaptive"](anchor_embedding, positive_embedding, negative_embedding)
 
             loss_eval += loss.item()
 

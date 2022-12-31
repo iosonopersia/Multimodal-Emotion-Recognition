@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 class VarianceLoss(torch.nn.Module):
     def __init__(self, eps=1e-6):
@@ -14,6 +15,6 @@ class VarianceLoss(torch.nn.Module):
     def Lvar(self, z):
 
         var_z = torch.var(z, dim=0)
-        result = (1 - torch.sqrt(var_z + self.eps)).mean()
+        result = F.relu((1 - torch.sqrt(var_z + self.eps))).mean()
         return result
 

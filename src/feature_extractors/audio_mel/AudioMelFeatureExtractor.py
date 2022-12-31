@@ -9,12 +9,12 @@ bedding of encoder network to desired representations'''
 class AudioMelFeatureExtractor(nn.Module):
     def __init__(self):
         super(AudioMelFeatureExtractor, self).__init__()
-        self.resnet18 = resnet18(pretrained=False)
+        self.resnet18 = resnet18(weights=None)
         # self.resnet18.fc = nn.Identity()
         self.projector = nn.Sequential(
             nn.Linear(1000, 768),
             nn.ReLU(),
-            nn.Linear(768, 768)
+            nn.Linear(768, 300)
         )
     def forward(self, x):
         x = self.resnet18(x)
@@ -26,7 +26,7 @@ class TestAudioExtractor(nn.Module):
     def __init__(self, load_checkpoint=True):
         super(TestAudioExtractor, self).__init__()
         self.audio_extractor = AudioMelFeatureExtractor()
-
+        self.audio_extractor.eval()
         if load_checkpoint:
             checkpoint = torch.load("checkpoints/audio_feature_extractor.pth")
             self.audio_extractor.load_state_dict(checkpoint['model_state_dict'])
@@ -35,9 +35,11 @@ class TestAudioExtractor(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(768, 256),
+            nn.Linear(300, 128),
             nn.ReLU(),
-            nn.Linear(256, 7)
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 7)
         )
 
     def forward(self, x):

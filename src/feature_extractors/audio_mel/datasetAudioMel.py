@@ -1,6 +1,6 @@
 # from tkinter import Image
 import torch
-from utils.dataset_utils import get_text
+from utils import get_text
 import os
 import torchaudio
 import matplotlib.pyplot as plt
@@ -8,19 +8,14 @@ from torchvision import transforms
 import warnings
 from PIL import Image
 import numpy as np
+import librosa
+from tqdm import tqdm
+import pandas as pd
 
-
-'''
-TODO build function to get the batch, this function will take as input the model, it will select valid triplets until I have
- n of them (with n = 100 in the beginning). A valid triplet is a triplet where the positive has the same label as the anchor and
- the negative has a different label.
- Once I have the valid triplets, I will pass them to the model and I will compute their embeddings and then I will compute the
- distance (just compute the triplet loss) between the embedding and I will choose the B hardest triplets.
-'''
 
 
 class DatasetMelAudio(torch.utils.data.Dataset):
-    def __init__(self, mode="train", config=None):
+    def __init__(self, mode="train", config=None, compute_statistics=False):
         super().__init__()
 
         self.MAX_AUDIO_LENGTH = 42000 # 42000 ms = 42 seconds
@@ -48,6 +43,12 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         emotion_labels = {"neutral": 0, "joy": 1, "sadness": 2, "anger": 3, "surprise": 4, "fear": 5, "disgust": 6}
         self.text["Emotion"] = self.text["Emotion"].map(emotion_labels)
 
+        if mode == "train" and compute_statistics:
+            self.max, self.min = self.compute_statistics()
+        else:
+            self.max = config.train.max_value
+            self.min = config.train.min_value
+
         # Count how many dialogues there are
         self.dialogue_ids = self.text["Dialogue_ID"].unique()
         print(f"Loaded {len(self.dialogue_ids)} dialogues for {self.mode}ing")
@@ -61,18 +62,21 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         dialogue_id = utterance["Dialogue_ID"]
         utterance_id = utterance["Utterance_ID"]
 
-        if self.mode == "train":
-            if (dialogue_id, utterance_id) in {(125, 3)}:
-                # This utterance video/audio is corrupted :-(
-                return self.__getitem__(idx + 1)
-        elif self.mode == "val":
-            if (dialogue_id, utterance_id) in {(110, 7)}:
-                # This utterance video/audio is corrupted :-(
-                return self.__getitem__(idx + 1)
-        elif self.mode == "test":
-            if (dialogue_id, utterance_id) in {(38,4),(220,0)}:
-                # This utterance video/audio is corrupted :-(
-                return self.__getitem__(idx + 1)
+        # if self.mode == "train":
+        #     if (dialogue_id, utterance_id) in {(125, 3)}:
+        #         # This utterance video/audio is corrupted :-(
+        #         return self.__getitem__(idx + 1)
+        # elif self.mode == "val":
+        #     if (dialogue_id, utterance_id) in {(110, 7)}:
+        #         # This utterance video/audio is corrupted :-(
+        #         return self.__getitem__(idx + 1)
+        # elif self.mode == "test":
+        #     if (dialogue_id, utterance_id) in {(38,4),(220,0)}:
+        #         # This utterance video/audio is corrupted :-(
+        #         return self.__getitem__(idx + 1)
+
+        if self.check_valid(utterance) == False:
+            return self.__getitem__(idx + 1)
 
         # Audio
         wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{dialogue_id}_utt{utterance_id}.wav")
@@ -89,7 +93,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
 
     def get_labels(self):
-        return self.text["Sentiment"].to_numpy(), self.text["Emotion"].to_numpy()
+        return self.text["Emotion"].to_numpy()
 
     def get_mel_spectogram(self, audio_path):
         '''
@@ -119,23 +123,34 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             audio_mel_spectogram = audio_mel_spectogram.permute(2, 0, 1)
             return audio_mel_spectogram
 
-        audio, sr = torchaudio.load(audio_path, format="wav")
+        audio, sr = torchaudio.load(audio_path, format="wav", normalize=True)
         audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH - audio.shape[1]), mode='constant', value=0)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = sr, n_fft=400, hop_length=160, n_mels=128)(audio)
+            audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
+            # normalize between 0 and 1
+            audio_mel_spectogram = (audio_mel_spectogram - (self.min)) / (self.max - self.min)
+
         # transform to RGB image
         audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
 
 
         # save to cache
         audio_mel_spectogram_save = audio_mel_spectogram.permute(1, 2, 0) * 255
-        audio_mel_spectogram_save = audio_mel_spectogram_save.numpy().astype(np.uint8)
+        # plt.imshow( audio_mel_spectogram_save )
+        audio_mel_spectogram_save = audio_mel_spectogram_save.numpy()
+        # plt.imshow( audio_mel_spectogram_save )
+        audio_mel_spectogram_save = audio_mel_spectogram_save.astype(np.uint8)
+        # plt.imshow( audio_mel_spectogram_save )
+
         audio_mel_spectogram_save = Image.fromarray(audio_mel_spectogram_save)
-        audio_mel_spectogram_save.save(audio_path_cache)
+        audio_mel_spectogram_save.save(audio_path_cache, mode="L")
 
         # plot
         # plt.imshow( audio_mel_spectogram.permute(1, 2, 0) )
+        # plt.imshow( audio_mel_spectogram_save )
+
 
         return audio_mel_spectogram
 
@@ -146,6 +161,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
     @torch.no_grad()
     def get_batched_triplets(self, batch_size, model):
         # Take randomly n samples from the dataset
+        model.eval()
         if self.mode == "val" or self.mode == "test":
             anchors = []
             positives = []
@@ -244,7 +260,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
 
         # BATCH
-        losses = torch.tensor([torch.abs(distance_matrix[index,p] - distance_matrix[index, n]) for index,(p,n) in enumerate(zip(positive_index, negative_index))])
+        losses = torch.tensor( [distance_matrix[index,p] - distance_matrix[index, n] for index,(p,n) in enumerate(zip(positive_index, negative_index))])
 
         # take the batch_size biggest losses
         losses, indices = torch.topk(losses, batch_size)
@@ -312,8 +328,12 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         return negative_mask
 
     def check_valid (self, utterance):
-        dialogue_id = utterance["Dialogue_ID"].iloc[0]
-        utterance_id = utterance["Utterance_ID"].iloc[0]
+        if (type(utterance) == pd.core.frame.DataFrame):
+            dialogue_id = utterance["Dialogue_ID"].iloc[0]
+            utterance_id = utterance["Utterance_ID"].iloc[0]
+        else:
+            dialogue_id = utterance["Dialogue_ID"]
+            utterance_id = utterance["Utterance_ID"]
         if self.mode == "train":
             if (dialogue_id, utterance_id) in {(125, 3)}:
                 # This utterance video/audio is corrupted :-(
@@ -330,7 +350,30 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
 
 
-
+    def compute_statistics(self):
+            # compute statistics
+        max_value = 0
+        min_value = float("inf")
+        for i in tqdm(range(len(self.text)), desc="Compute statistics"):
+            utterance = self.text.iloc[i]
+            if self.check_valid(utterance)==False:
+                continue
+            dialogue_id = utterance["Dialogue_ID"]
+            utterance_id = utterance["Utterance_ID"]
+            audio_path = os.path.join(os.path.abspath(self.audio_path), f"dia{dialogue_id}_utt{utterance_id}.wav")
+            audio, sr = torchaudio.load(audio_path, format="wav", normalize=True)
+            audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH - audio.shape[1]), mode='constant', value=0)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = sr, n_fft=400, hop_length=160, n_mels=128)(audio)
+                audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
+                if audio_mel_spectogram.max() > max_value:
+                    max_value = audio_mel_spectogram.max()
+                    # print (max_value)
+                if audio_mel_spectogram.min() < min_value:
+                    min_value = audio_mel_spectogram.min()
+                    # print (min_value)
+        return max_value, min_value
 
 
 if __name__ == "__main__":
@@ -338,8 +381,10 @@ if __name__ == "__main__":
     dataset = DatasetMelAudio(mode="train")
     print(dataset[0])
 
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
-    for batch in dataloader:
-        print(batch)
+
+
+    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
+    # for batch in dataloader:
+    #     print(batch)
 
 
