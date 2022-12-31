@@ -1,12 +1,13 @@
 import os
 import torch
 import wandb
-from datasets.datasetAudioMel import DatasetMelAudio as Dataset
-from models.AudioMelFeatureExtractor import TestAudioExtractor
+from datasetAudioMel import DatasetMelAudio as Dataset
+from AudioMelFeatureExtractor import TestAudioExtractor
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.metrics import accuracy_score, f1_score
 from munch import Munch
+from sklearn.utils import class_weight
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -15,7 +16,7 @@ logging.set_verbosity_error()
 
 def main(config=None):
     #CONFIG
-    with open('./src/config_audio_mel.yaml', 'rt', encoding='utf-8') as f:
+    with open('./src/feature_extractors/audio_mel/config_only_audio.yaml', 'rt', encoding='utf-8') as f:
         config = Munch.fromYAML(f.read())
 
     #============DEVICE===============
@@ -42,7 +43,14 @@ def main(config=None):
 
     #============CRITERION===============
     #------------------------------------
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+    balance_classes = False
+    if balance_classes:
+        emotions = data_train.get_labels() # Use training data to compute class weights
+        class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=[0, 1, 2, 3, 4, 5, 6], y=emotions)
+        class_weights = torch.as_tensor(class_weights, dtype=torch.float, device=device)
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights, ignore_index=-1)
+    else:
+        criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
 
     #============OPTIMIZER===============
     #------------------------------------
@@ -193,7 +201,7 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
         outputs = model(audio)
         loss = criterion(outputs, emotion.squeeze())
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         loss_train += loss.item()
