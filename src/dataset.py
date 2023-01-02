@@ -86,7 +86,7 @@ class Dataset(torch.utils.data.Dataset):
         padding_mask = torch.zeros_like(emotion, dtype=torch.bool)
         padding_mask[emotion == -1] = True
 
-        return {"text": text, "audio": audio, "emotion": emotion, padding_mask: padding_mask}
+        return {"text": text, "audio": audio, "emotion": emotion, "padding_mask": padding_mask}
 
     def get_labels(self):
         return self.text["Emotion"].to_numpy()
