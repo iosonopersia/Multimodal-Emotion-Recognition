@@ -1,7 +1,9 @@
+librosa==0.9.2
 matplotlib==3.6.2
 munch==2.5.0
 numpy==1.24.0
 pandas==1.5.2
+plotly==5.11.0
 pyYAML==6.0
 soundfile==0.11.0
 torch==1.13.1
