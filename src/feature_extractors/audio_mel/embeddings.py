@@ -43,7 +43,7 @@ def main():
     model = AudioMelFeatureExtractor().to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
 
-    save_path = "embeddings/audio_mel"
+    save_path = "embeddings/audio_MEL"
     save_embeddings(dl_train, model, device, save_path, "train")
     save_embeddings(dl_val, model, device, save_path, "val")
     save_embeddings(dl_test, model, device, save_path, "test")
