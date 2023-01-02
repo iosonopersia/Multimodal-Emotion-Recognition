@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class FusionAttentionLayer(nn.Module):
+class FusionAttentionModule(nn.Module):
     def __init__(self, embedding_size, n_head, dropout):
         super().__init__()
         self.multihead_attention = nn.MultiheadAttention(embedding_size, n_head, batch_first=True, dropout=dropout)
@@ -45,22 +45,29 @@ class M2FNet(nn.Module):
         hidden_size_classifier = config.CLASSIFIER.HIDDEN_SIZE
         output_size = config.OUTPUT_SIZE
 
-        # Audio and text encoders
+        # Audio encoders
         audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
         audio_encoder_norm = nn.LayerNorm(d_model_audio)
         self.audio_encoders = nn.ModuleList([
             nn.TransformerEncoder(encoder_layer=audio_encoder_layer, norm=audio_encoder_norm, num_layers=n_layers_audio)
             for _ in range(n_encoders_audio)])
 
+        # Text encoders
         text_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_text, nhead=self.n_head_text, dropout=dropout)
         text_encoder_norm = nn.LayerNorm(d_model_text)
         self.text_encoders = nn.ModuleList([
             nn.TransformerEncoder(encoder_layer=text_encoder_layer, norm=text_encoder_norm, num_layers=n_layers_text)
             for _ in range(n_encoders_text)])
 
-        # Fusion Attention layers
+        # Audio projection layer
+        self.audio_proj = nn.Linear(d_model_audio, d_model_fam)
+
+        # Text projection layer
+        self.text_proj = nn.Linear(d_model_text, d_model_fam)
+
+        # Fusion Attention Module layers
         self.fusion_layers = nn.ModuleList([
-            FusionAttentionLayer(embedding_size=d_model_fam, n_head=self.n_head_fam, dropout=dropout)
+            FusionAttentionModule(embedding_size=d_model_fam, n_head=self.n_head_fam, dropout=dropout)
             for _ in range(n_fam_layers)])
 
         # Output layers
@@ -89,6 +96,10 @@ class M2FNet(nn.Module):
 
         text = text.permute(1, 0, 2)
         audio = audio.permute(1, 0, 2)
+
+        # Projection layers
+        audio = self.audio_proj(audio)
+        text = self.text_proj(text)
 
         # Fusion Attention layers
         for fusion_layer in self.fusion_layers:
