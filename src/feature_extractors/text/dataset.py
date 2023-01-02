@@ -33,9 +33,12 @@ class Dataset(torch.utils.data.Dataset):
         # Emotion
         emotion = int(df_row["Emotion"])
 
-        return {"text": text, "emotion": emotion}
+        return {"idx": idx, "text": text, "emotion": emotion}
 
     def collate_fn(self, batch):
+        # idx
+        idx = [d["idx"] for d in batch]
+
         # text
         text = self.roberta_tokenizer([d["text"] for d in batch], return_tensors="pt", padding="longest", truncation=True, max_length=512)
         attention_mask = text["attention_mask"].long()
@@ -44,7 +47,7 @@ class Dataset(torch.utils.data.Dataset):
         # emotion
         emotion = torch.tensor([d["emotion"] for d in batch], dtype=torch.int64)
 
-        return {"text": text, "attention_mask": attention_mask, "emotion": emotion}
+        return {"idx": idx, "text": text, "attention_mask": attention_mask, "emotion": emotion}
 
     def get_labels(self):
         return self.text["Emotion"].to_numpy()

@@ -22,10 +22,11 @@ def main():
     #============LOAD DATA===============
     #------------------------------------
     dataloader_config = {
-        'batch_size': 1, # We need to preserve the order of the data
-        'shuffle': False, # We need to preserve the order of the data
-        'num_workers': 0, # We need to preserve the order of the data
-        'pin_memory': True
+        'batch_size': 32,
+        'shuffle': False,
+        'num_workers': 0,
+        'pin_memory': True,
+        'drop_last': False
     }
     data_train = Dataset(mode="train")
     data_val = Dataset(mode="val")
@@ -37,8 +38,20 @@ def main():
 
     #============MODEL===============
     #--------------------------------
-    roberta_checkpoint_path = os.path.abspath(config.save_pretrained.path)
-    model = RobertaModel.from_pretrained(roberta_checkpoint_path, add_pooling_layer=False).to(device)
+    model = RobertaModel.from_pretrained('roberta-base', add_pooling_layer=False).to(device)
+
+    roberta_checkpoint_path = os.path.abspath(config.checkpoint.save_path)
+    if (os.path.exists(roberta_checkpoint_path)):
+        checkpoint = torch.load(roberta_checkpoint_path)
+        roberta_prefix = "roberta."
+        roberta_state_dict = {
+            key.removeprefix(roberta_prefix): value
+            for (key,value) in checkpoint["model_state_dict"].items()
+            if key.startswith(roberta_prefix)
+        }
+        model.load_state_dict(roberta_state_dict)
+    else:
+        raise ValueError("Checkpoint not found")
 
     save_path = "embeddings/text"
     save_embeddings(dl_train, model, device, save_path, "train")
@@ -47,26 +60,24 @@ def main():
 
 
 def save_embeddings(dataloader, model, device, path, mode):
-    embeddings_list = []
+    embeddings_tensor = torch.zeros(len(dataloader.dataset), 768, dtype=torch.float32)
 
     print(f"Saving {mode} embeddings...")
 
     model.eval()
     with torch.inference_mode():
-        for batch in tqdm(dataloader): # TODO: the dataset should give us the indices of each samples, so that we can preserve the order
-            text, emotion, attention_mask = batch["text"], batch["emotion"], batch["attention_mask"]
-
-            text = text.to(device)
-            emotion = emotion.to(device)
-            attention_mask = attention_mask.to(device)
+        for batch in tqdm(dataloader):
+            idx = batch["idx"]
+            text = batch["text"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
 
             embeddings = model(text, attention_mask)
             embeddings = embeddings.last_hidden_state
             embeddings = embeddings[:, 0, :] # [CLS] token
-            embeddings = embeddings.detach().cpu()
-            embeddings_list.append(embeddings)
+            embeddings = embeddings.cpu()
 
-    embeddings_tensor = torch.cat(embeddings_list, dim=0)
+            embeddings_tensor[idx] = embeddings
+
     os.makedirs(path, exist_ok=True)
     save_path = os.path.join(os.path.abspath(path), f"{mode}.pkl")
     pickle.dump(embeddings_tensor, open(save_path, "wb"))

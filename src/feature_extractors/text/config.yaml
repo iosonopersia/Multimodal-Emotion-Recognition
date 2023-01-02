@@ -3,10 +3,6 @@ checkpoint:
     save_path: checkpoints/text/checkpoint.pth
     save_checkpoint: True
 
-save_pretrained:
-    enabled: True
-    path: checkpoints/text/roberta-base
-
 solver:
     loss_fn: CE
     balance_classes: False

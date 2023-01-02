@@ -201,17 +201,6 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
     if wandb_log:
         wandb.finish()
 
-    # Save fine-tuned RoBERTa model:
-    if config.save_pretrained.enabled:
-        roberta_checkpoint_folder = os.path.abspath(config.save_pretrained.path)
-        if early_stopping and restore_best_weights:
-            print(f"Saving BEST checkpoint of fine-tuned RoBERTa model...")
-        else:
-            print(f"Saving LAST checkpoint of fine-tuned RoBERTa model...")
-        model_params = torch.load(save_checkpoint_path)
-        model.load_state_dict(model_params['model_state_dict'])
-        model.roberta.save_pretrained(roberta_checkpoint_folder)
-
     return {'loss_values': losses_values}
 
 def train(model, dl_train, criterion, optimizer, lr_scheduler, is_frozen_epoch, epoch, wandb_log, device):
