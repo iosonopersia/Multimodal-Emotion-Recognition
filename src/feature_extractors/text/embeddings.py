@@ -22,9 +22,9 @@ def main():
     #============LOAD DATA===============
     #------------------------------------
     dataloader_config = {
-        'batch_size': 16,
+        'batch_size': 1, # We need to preserve the order of the data
         'shuffle': False, # We need to preserve the order of the data
-        'num_workers': 2,
+        'num_workers': 0, # We need to preserve the order of the data
         'pin_memory': True
     }
     data_train = Dataset(mode="train")
@@ -53,7 +53,7 @@ def save_embeddings(dataloader, model, device, path, mode):
 
     model.eval()
     with torch.inference_mode():
-        for batch in tqdm(dataloader):
+        for batch in tqdm(dataloader): # TODO: the dataset should give us the indices of each samples, so that we can preserve the order
             text, emotion, attention_mask = batch["text"], batch["emotion"], batch["attention_mask"]
 
             text = text.to(device)
