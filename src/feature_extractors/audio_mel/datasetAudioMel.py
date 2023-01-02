@@ -62,19 +62,6 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         dialogue_id = utterance["Dialogue_ID"]
         utterance_id = utterance["Utterance_ID"]
 
-        # if self.mode == "train":
-        #     if (dialogue_id, utterance_id) in {(125, 3)}:
-        #         # This utterance video/audio is corrupted :-(
-        #         return self.__getitem__(idx + 1)
-        # elif self.mode == "val":
-        #     if (dialogue_id, utterance_id) in {(110, 7)}:
-        #         # This utterance video/audio is corrupted :-(
-        #         return self.__getitem__(idx + 1)
-        # elif self.mode == "test":
-        #     if (dialogue_id, utterance_id) in {(38,4),(220,0)}:
-        #         # This utterance video/audio is corrupted :-(
-        #         return self.__getitem__(idx + 1)
-
         if self.check_valid(utterance) == False:
             return self.__getitem__(idx + 1)
 
@@ -159,10 +146,17 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         return distance
 
     @torch.no_grad()
-    def get_batched_triplets(self, batch_size, model):
-        # Take randomly n samples from the dataset
+    def get_batched_triplets(self, batch_size, model, mining_type="random", margin=0.2):
+        '''
+        mining_type = "hard", "semi-hard", "random"
+        '''
+        if mining_type not in ["hard", "semi-hard", "random"]:
+            raise ValueError("mining_type must be 'hard', 'semi-hard' or 'random'")
+
+        device = next(model.parameters()).device
         model.eval()
-        if self.mode == "val" or self.mode == "test":
+
+        if mining_type == "random":
             anchors = []
             positives = []
             negatives = []
@@ -199,6 +193,64 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             negatives = torch.stack(negatives)
             return {"anchor": anchors, "positive": positives, "negative": negatives}
 
+        if mining_type == "semi-hard":
+            anchors = []
+            positives = []
+            negatives = []
+            # take batch_size valid triples
+            for i in range(batch_size):
+                hard_negative = False
+                count = 0 # count the number of tries
+                while hard_negative == False:
+                    count += 1
+                    #anchors
+                    anchor_utterance = self.text.sample()
+                    while (self.check_valid(anchor_utterance) == False):
+                        anchor_utterance = self.text.sample()
+                    anchor_dialogue_id = anchor_utterance["Dialogue_ID"].iloc[0]
+                    anchor_utterance_id = anchor_utterance["Utterance_ID"].iloc[0]
+                    anchor = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{anchor_dialogue_id}_utt{anchor_utterance_id}.wav"))
+
+                    # positives
+                    positive_utterance = self.text.sample()
+                    while (self.check_valid(positive_utterance) == False) or (positive_utterance["Emotion"].iloc[0] != anchor_utterance["Emotion"].iloc[0]):
+                        positive_utterance = self.text.sample()
+                    positive_dialogue_id = positive_utterance["Dialogue_ID"].iloc[0]
+                    positive_utterance_id = positive_utterance["Utterance_ID"].iloc[0]
+                    positive = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{positive_dialogue_id}_utt{positive_utterance_id}.wav"))
+
+
+                    negative_utterance = self.text.sample()
+                    while (self.check_valid(negative_utterance) == False) or (negative_utterance["Emotion"].iloc[0] == anchor_utterance["Emotion"].iloc[0]):
+                        negative_utterance = self.text.sample()
+                    negative_dialogue_id = negative_utterance["Dialogue_ID"].iloc[0]
+                    negative_utterance_id = negative_utterance["Utterance_ID"].iloc[0]
+                    negative = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{negative_dialogue_id}_utt{negative_utterance_id}.wav"))
+
+                    anchor_embedding = model(anchor.unsqueeze(0).to(device))
+                    positive_embedding = model(positive.unsqueeze(0).to(device))
+                    negative_embedding = model(negative.unsqueeze(0).to(device))
+
+                    anchor_positive_distance = self.compute_distance(anchor_embedding, positive_embedding)
+                    anchor_negative_distance = self.compute_distance(anchor_embedding, negative_embedding)
+
+                    if anchor_positive_distance < anchor_negative_distance < anchor_positive_distance + margin:
+                        hard_negative = True
+                # print(f"count: {count}")
+                if count > 100:
+                    print("count > 100")
+
+
+                anchors.append(anchor)
+                positives.append(positive)
+                negatives.append(negative)
+
+
+            anchors = torch.stack(anchors)
+            positives = torch.stack(positives)
+            negatives = torch.stack(negatives)
+            return {"anchor": anchors, "positive": positives, "negative": negatives}
+
 
         i = 0
         embeddings = []
@@ -207,7 +259,6 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         positive = []
         negative = []
         random_audio_mel_spectograms = []
-        device = next(model.parameters()).device
         self.len_triplet_picking = (self.len_triplet_picking // batch_size) * batch_size
         while i < self.len_triplet_picking:
             random_utterance = self.text.sample()
