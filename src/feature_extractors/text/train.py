@@ -2,7 +2,7 @@ import os
 import torch
 import wandb
 from dataset import Dataset
-from models import TextERC
+from model import TextERC
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.utils import class_weight
