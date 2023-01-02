@@ -1,6 +1,9 @@
 DEBUG:
-  enabled: False
-  num_samples: 64
+  enabled: True
+  num_samples: 32
+  train: True
+  visualize: True
+  visualization_type: "3D" # 3D or 2D
 
 AUDIO:
     ffmpeg_sr: 16000
@@ -13,11 +16,12 @@ checkpoint:
     load_checkpoint: False
 
 solver:
-    adaptive_triplet_margin_loss:
-        enabled: True
-    lr: 1.0e-4
+    adaptive_triplet_margin_loss: False
+    covariance_loss: False
+    variance_loss: False
+    lr: 1.0e-5
     weight_decay: 1.0e-6
-    epochs: 60
+    epochs: 50
     scheduler:
         enabled: False
         scheduler_fn: ExponentialLR
@@ -32,7 +36,7 @@ model:
 train:
     data_loader:
         shuffle: True
-        batch_size: 32
+        batch_size: 2
         num_workers: 3
         pin_memory: True
     max_value: 32.4030  # db scale:32.4030 | normal scale:1738.9810
@@ -41,20 +45,20 @@ train:
 val:
     data_loader:
         shuffle: False
-        batch_size: 32
+        batch_size: 2
         num_workers: 3
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
-        batch_size: 1
-        num_workers: 1
+        batch_size: 32
+        num_workers: 3
         pin_memory: True
 
 wandb:
     enabled: False
     watch_model: True
-    project_name: multimodal-emotion-recognition-audio-extractor
+    project_name: audio-mel-embeddings
 
 ...
