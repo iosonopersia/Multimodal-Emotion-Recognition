@@ -33,7 +33,7 @@ def main(config=None):
 
     #============LOAD================
     #--------------------------------
-    load_checkpoint_path = os.path.join(os.path.abspath(config.checkpoint.save_folder), 'checkpoint.pth')
+    load_checkpoint_path = os.path.abspath(config.checkpoint.save_path)
 
     if (os.path.exists(load_checkpoint_path)):
         checkpoint = torch.load(load_checkpoint_path)
