@@ -35,7 +35,7 @@ solver:
 model:
     DROPOUT: 0.4
     AUDIO:
-        EMBEDDING_SIZE: 768
+        EMBEDDING_SIZE: 300
         N_HEAD: 8
         N_LAYERS: 1
         N_ENCODERS: 1

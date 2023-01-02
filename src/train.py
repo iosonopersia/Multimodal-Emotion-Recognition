@@ -1,17 +1,18 @@
 import os
-import torch
-import wandb
-from utils import get_config
-from datasets.dataset import Dataset
-from models.FeatureExtractor import FeatureExtractor
-from models.M2FNet import M2FNet
-from tqdm import tqdm
 from datetime import datetime
-from sklearn.utils import class_weight
+
+import torch
 from sklearn.metrics import accuracy_score, f1_score
+from sklearn.utils import class_weight
+from tqdm import tqdm
+from transformers import logging
+
+import wandb
+from dataset import Dataset
+from model import M2FNet
+from utils import get_config
 
 # Suppress warnings from 'transformers' package
-from transformers import logging
 logging.set_verbosity_error()
 
 
@@ -29,23 +30,16 @@ def main(config=None):
     data_train = Dataset(mode="train")
 
     train_dl_cfg = config.train.data_loader
-    dl_train = torch.utils.data.DataLoader(data_train, collate_fn=data_train.my_collate_fn, **train_dl_cfg)
+    dl_train = torch.utils.data.DataLoader(data_train, collate_fn=data_train.collate_fn, **train_dl_cfg)
 
     # VAL DATA
     data_val = Dataset(mode="val")
 
     val_dl_cfg = config.val.data_loader
-    dl_val = torch.utils.data.DataLoader(data_val, collate_fn=data_val.my_collate_fn, **val_dl_cfg)
+    dl_val = torch.utils.data.DataLoader(data_val, collate_fn=data_val.collate_fn, **val_dl_cfg)
 
     #============MODEL===============
     #--------------------------------
-    roberta_checkpoint_folder = os.path.abspath(config.feature_extractors.text.checkpoint)
-
-    if (os.path.exists(roberta_checkpoint_folder)):
-        feature_extractor = FeatureExtractor(roberta_checkpoint=roberta_checkpoint_folder).to(device)
-    else:
-        print("Fine-tuned RoBERTa checkpoint not found. Using 'roberta-base'.")
-        feature_extractor = FeatureExtractor().to(device)
     model = M2FNet(config.model).to(device)
 
     #============CRITERION===============
@@ -103,7 +97,6 @@ def main(config=None):
     print("Training...")
     training_loop(
         model,
-        feature_extractor,
         dl_train,
         dl_val,
         criterion,
@@ -111,13 +104,12 @@ def main(config=None):
         lr_scheduler,
         start_epoch,
         config,
-        device,
-        # hyperparameter_search
+        device
     )
     print("Training complete")
 
 
-def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
+def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -153,7 +145,6 @@ def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimiz
     for epoch in range(start_epoch, epochs):
         loss_train = train(
             model,
-            feature_extractor,
             dl_train,
             criterion,
             optimizer,
@@ -164,7 +155,6 @@ def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimiz
 
         loss_val, accuracy, weighted_f1 = validate(
             model,
-            feature_extractor,
             dl_val,
             criterion,
             device)
@@ -218,43 +208,23 @@ def training_loop(model, feature_extractor, dl_train, dl_val, criterion, optimiz
                         print(f"Best model at epoch {best_model['epoch']} restored")
                     break
 
-        # Hyperparameter search
-        # if hyperparameter_search:
-        #     with tune.checkpoint_dir(epoch):
-        #         path = save_checkpoint_path
-        #         os.makedirs(path, exist_ok=True)
-        #         path += os.sep + "checkpoint.pth"
-        #         torch.save((model.state_dict(), optimizer.state_dict()), path)
-
-        #     tune.report(loss=orig_mre_loss)
-
     if wandb_log:
         wandb.finish()
 
     return {'loss_values': losses_values}
 
-def train(model, feature_extractor, dl_train, criterion, optimizer, epoch, wandb_log, device):
+def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
 
     model.train()
     for idx_batch, data in tqdm(enumerate(dl_train), total=len(dl_train)):
-        text, audio, emotion = data["text"], data["audio"], data["emotion"]
-        emotion = emotion.to(device)
+        text = data["text"].to(device)
+        audio = data["audio"].to(device)
+        emotion = data["emotion"].to(device)
+        padding_mask = data["padding_mask"].to(device)
 
-        feature_extractor.eval()
-        with torch.no_grad():
-            text = [t.to(device) for t in text]
-            audio = [[aa.to(device) for aa in a] for a in audio]
-
-            text, audio, mask = feature_extractor(text, audio)
-
-        # Start recording gradients from here
-        text.requires_grad_(True)
-        audio.requires_grad_(True)
-
-        # Feature extractor
         optimizer.zero_grad()
-        outputs = model(text, audio, mask)
+        outputs = model(text, audio, padding_mask)
         loss = criterion(outputs.permute(0, 2, 1), emotion)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -271,23 +241,20 @@ def train(model, feature_extractor, dl_train, criterion, optimizer, epoch, wandb
 
     return loss_train / len(dl_train)
 
-def validate(model, feature_extractor, dl_val, criterion, device):
+def validate(model, dl_val, criterion, device):
     loss_eval = 0
     accuracy = 0
     weighted_f1 = 0
 
-    feature_extractor.eval()
     model.eval()
     with torch.inference_mode():
         for data in tqdm(dl_val, total=len(dl_val)):
-            text, audio, emotion = data["text"], data["audio"], data["emotion"]
-            emotion = emotion.to(device)
+            text = data["text"].to(device)
+            audio = data["audio"].to(device)
+            emotion = data["emotion"].to(device)
+            padding_mask = data["padding_mask"].to(device)
 
-            text = [t.to(device) for t in text]
-            audio = [[aa.to(device) for aa in a] for a in audio]
-            text, audio, mask = feature_extractor(text, audio)
-
-            outputs = model(text, audio, mask)
+            outputs = model(text, audio, padding_mask)
             loss = criterion(outputs.permute(0, 2, 1), emotion)
 
             # Calculate metrics
