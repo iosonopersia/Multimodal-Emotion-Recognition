@@ -47,4 +47,28 @@ class TestAudioExtractor(nn.Module):
         x = self.classifier(x)
         return x
 
+class M2FnetLossAudioMEL(nn.Module):
+    def __init__(self, adaptive=True, covariance=True, variance=True):
+        super(M2FnetLossAudioMEL, self).__init__()
+        self.adaptive = adaptive
+        self.covariance = covariance
+        self.variance = variance
+
+        if self.adaptive:
+            self.triplet_loss = AdaptiveTripletMarginLoss()
+        else:
+            self.triplet_loss = torch.nn.TripletMarginLoss(margin=0.2, p=2)
+
+        self.covariance_loss = CovarianceLoss()
+        self.variance_loss = VarianceLoss()
+
+
+    def forward(self, anchor, positive, negative):
+        loss = 20 * self.triplet_loss(anchor, positive, negative)
+        if self.covariance:
+            loss += 5 * self.covariance_loss(anchor, positive, negative)
+        if self.variance:
+            loss += 1 * self.variance_loss(anchor, positive, negative)
+        return loss
+
 
