@@ -2,14 +2,15 @@ import os
 import torch
 import wandb
 from datasetAudioMel import DatasetMelAudio as Dataset
-from AudioMelFeatureExtractor import AudioMelFeatureExtractor
+from AudioMelFeatureExtractor import AudioMelFeatureExtractor, M2FnetLossAudioMEL
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.utils import class_weight
 from munch import Munch
-from losses.AdaptiveTripletMarginLoss import AdaptiveTripletMarginLoss
-from losses.VarianceLoss import VarianceLoss
-from losses.CovarianceLoss import CovarianceLoss
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+import plotly.express as px
+import numpy as np
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -39,6 +40,12 @@ def main(config=None):
     # val_dl_cfg = config.val.data_loader
     # dl_val = torch.utils.data.DataLoader(data_val, **val_dl_cfg)
 
+    # TEST DATA
+    data_test = Dataset(mode="test", config=config)
+
+    test_dl_cfg = config.test.data_loader
+    dl_test = torch.utils.data.DataLoader(data_test, **test_dl_cfg)
+
     #============MODEL===============
     #--------------------------------
     model = AudioMelFeatureExtractor().to(device)
@@ -47,10 +54,10 @@ def main(config=None):
     #------------------------------------
 
     #triplet loss
-    if config.solver.adaptive_triplet_margin_loss.enabled:
-        criterion = {"adaptive":AdaptiveTripletMarginLoss(), "variance":VarianceLoss(), "covariance":CovarianceLoss()}
-    else:
-        criterion = torch.nn.TripletMarginLoss(margin=1.0, p=2)
+    adaptive = config.solver.adaptive_triplet_margin_loss
+    covariance = config.solver.covariance_loss
+    variance = config.solver.variance_loss
+    criterion = M2FnetLossAudioMEL(adaptive=adaptive, covariance=covariance, variance=variance).to(device)
 
     #============OPTIMIZER===============
     #------------------------------------
@@ -81,28 +88,34 @@ def main(config=None):
     load_checkpoint = config.checkpoint.load_checkpoint
     load_checkpoint_path = config.checkpoint.load_path
 
-    if (load_checkpoint and os.path.exists(load_checkpoint_path)):
-        checkpoint = torch.load(load_checkpoint_path)
-        start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    if (load_checkpoint):
+        if os.path.exists(load_checkpoint_path):
+            checkpoint = torch.load(load_checkpoint_path)
+            start_epoch = checkpoint['epoch']
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        else:
+            raise ValueError("Checkpoint not found")
 
     #============TRAIN===============
     #--------------------------------
-    print("Training...")
-    training_loop(
-        model,
-        data_train,
-        data_val,
-        criterion,
-        optimizer,
-        lr_scheduler,
-        start_epoch,
-        config,
-        device,
-        # hyperparameter_search
-    )
-    print("Training complete")
+    if config.DEBUG.train:
+        print("Training...")
+        training_loop(
+            model,
+            data_train,
+            data_val,
+            criterion,
+            optimizer,
+            lr_scheduler,
+            start_epoch,
+            config,
+            device,
+            # hyperparameter_search
+        )
+        print("Training complete")
+    if config.DEBUG.visualize:
+        visualize_model(model, dl_test, device, config.DEBUG.visualization_type)
 
 
 def training_loop(model, data_train, data_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
@@ -208,7 +221,10 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     n_steps = len(data_train) // batch_size
     for idx_batch in tqdm(range(n_steps), "Training epoch {}".format(epoch)):
         with torch.inference_mode():
-            data = data_train.get_batched_triplets(batch_size, model)
+            if epoch < 20:
+                data = data_train.get_batched_triplets(batch_size, model, mining_type="semi-hard")
+            else:
+                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard")
 
         model.train()
         anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
@@ -218,10 +234,7 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
         anchor_embedding = model(anchor)
         positive_embedding = model(positive)
         negative_embedding = model(negative)
-        loss = 20* criterion["adaptive"](anchor_embedding, positive_embedding, negative_embedding) + \
-                5 * criterion["covariance"](anchor_embedding, positive_embedding, negative_embedding) + \
-                1 * criterion ["variance"](anchor_embedding, positive_embedding, negative_embedding)
-        # loss = criterion["variance"](anchor_embedding, positive_embedding, negative_embedding)
+        loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
 
 
         loss.backward()
@@ -252,15 +265,53 @@ def validate(model, data_val, criterion, device):
             positive_embedding = model(positive)
             negative_embedding = model(negative)
 
-            loss = 20 * criterion["adaptive"](anchor_embedding, positive_embedding, negative_embedding) + \
-                    5 * criterion["covariance"](anchor_embedding, positive_embedding, negative_embedding) + \
-                criterion ["variance"](anchor_embedding, positive_embedding, negative_embedding)
-
-            # loss = criterion["adaptive"](anchor_embedding, positive_embedding, negative_embedding)
+            loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
 
             loss_eval += loss.item()
 
     return loss_eval / n_steps
+
+def visualize_model (model, dl_test, device, visualization_type= "3D"):
+    if visualization_type == "3D":
+        tsne = TSNE(n_components=3)
+    elif visualization_type == "2D":
+        tsne = TSNE(n_components=2)
+    else:
+        raise ValueError("Visualization type not supported")
+    model.eval()
+    embeddings = []
+    predicted_labels = []
+    true_labels = []
+    with torch.inference_mode():
+        for i, data in tqdm(enumerate(dl_test), "Visualizing", total=len(dl_test)):
+            inputs, labels = data["audio_mel_spectogram"].to(device), data["emotion"].to(device)
+            outputs = model(inputs)
+            for j in range(len(inputs)):
+                # outputs = tsne.fit_transform(outputs.cpu().detach().numpy())
+                embeddings.append(outputs[j].cpu().detach().numpy())
+                true_labels.append(labels[j].item())
+    # visualize embeddings
+    # Extract the x, y, and z coordinates of the 3D embeddings
+    # embeddings = tsne.fit_transform(np.array(embeddings))
+    embeddings = PCA(random_state=0).fit_transform(np.array(embeddings))[:,:50]
+    embeddings = tsne.fit_transform(np.array(embeddings))
+
+    true_labels = np.array(true_labels)
+    x = embeddings[:, 0]
+    y = embeddings[:, 1]
+    if visualization_type == "3D":
+        z = embeddings[:, 2]
+
+    # Create a scatter plot of the 3D embeddings
+    if visualization_type == "3D":
+        fig = px.scatter_3d(x=x, y=y, z=z, text=true_labels, color=true_labels, opacity=0.7, width=800, height=800)
+    else:
+        fig = px.scatter(x=x, y=y, text=true_labels, color=true_labels, opacity=0.7, width=800, height=800)
+
+    # Show the plot
+    fig.show()
+
+
 
 
 if __name__ == "__main__":
