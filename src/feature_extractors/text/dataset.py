@@ -13,15 +13,6 @@ class Dataset(torch.utils.data.Dataset):
 
         self.text = get_text(mode)
 
-        # Remove corrupted multimedia files
-        if self.mode == "train":
-            self.text = self.text[(self.text["Dialogue_ID"] != 125) | (self.text["Utterance_ID"] != 3)]
-        elif self.mode == "val":
-            self.text = self.text[(self.text["Dialogue_ID"] != 110) | (self.text["Utterance_ID"] != 7)]
-        elif self.mode == "test":
-            self.text = self.text[(self.text["Dialogue_ID"] != 38) | (self.text["Utterance_ID"] != 4)]
-            self.text = self.text[(self.text["Dialogue_ID"] != 220) | (self.text["Utterance_ID"] != 0)]
-
         # Map labels to class indices
         emotion_labels = {"neutral": 0, "joy": 1, "sadness": 2, "anger": 3, "surprise": 4, "fear": 5, "disgust": 6}
         self.text["Emotion"] = self.text["Emotion"].map(emotion_labels)
