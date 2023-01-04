@@ -9,8 +9,8 @@ from transformers.models.roberta.modeling_roberta import (
 class TextERC(torch.nn.Module):
     def __init__(self, num_classes=7):
         super().__init__()
-        config = RobertaConfig.from_pretrained('roberta-base', num_labels=num_classes)
-        self.roberta = RobertaModel.from_pretrained('roberta-base', add_pooling_layer=False, config=config)
+        config = RobertaConfig.from_pretrained('roberta-large', num_labels=num_classes)
+        self.roberta = RobertaModel.from_pretrained('roberta-large', add_pooling_layer=False, config=config)
         self.classifier_head = RobertaClassificationHead(config)
 
     def forward(self, input_ids, attention_mask):

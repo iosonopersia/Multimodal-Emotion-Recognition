@@ -11,7 +11,7 @@ solver:
     frozen_lr: 1.0e-4
     finetuning_lr: 2.0e-6
     weight_decay: 0.01
-    epochs: 16
+    epochs: 100
     early_stopping:
         enabled: True
         patience: 5
@@ -21,21 +21,21 @@ train:
     data_loader:
         shuffle: True
         batch_size: 16
-        num_workers: 0
+        num_workers: 2
         pin_memory: True
 
 val:
     data_loader:
         shuffle: False
         batch_size: 16
-        num_workers: 0
+        num_workers: 2
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
         batch_size: 16
-        num_workers: 0
+        num_workers: 2
         pin_memory: True
 
 wandb:

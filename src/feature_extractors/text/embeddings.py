@@ -38,7 +38,7 @@ def main():
 
     #============MODEL===============
     #--------------------------------
-    model = RobertaModel.from_pretrained('roberta-base', add_pooling_layer=False).to(device)
+    model = RobertaModel.from_pretrained('roberta-large', add_pooling_layer=False)
 
     roberta_checkpoint_path = os.path.abspath(config.checkpoint.save_path)
     if (os.path.exists(roberta_checkpoint_path)):
@@ -52,6 +52,7 @@ def main():
         model.load_state_dict(roberta_state_dict)
     else:
         raise ValueError("Checkpoint not found")
+    model = model.to(device)
 
     save_path = "embeddings/text"
     save_embeddings(dl_train, model, device, save_path, "train")
