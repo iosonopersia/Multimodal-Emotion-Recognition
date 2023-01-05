@@ -1,7 +1,7 @@
 import os
 import torch
 from utils import get_config
-from dataset import Dataset
+from dataset import Dataset, collate_fn
 from model import M2FNet
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score
@@ -23,9 +23,8 @@ def main(config=None):
     #------------------------------------
     # TEST DATA
     data_test = Dataset(mode="test")
-
     test_dl_cfg = config.test.data_loader
-    dl_test = torch.utils.data.DataLoader(data_test, collate_fn=data_test.collate_fn, **test_dl_cfg)
+    dl_test = torch.utils.data.DataLoader(data_test, collate_fn=collate_fn, **test_dl_cfg)
 
     #============MODEL===============
     #--------------------------------
@@ -33,7 +32,7 @@ def main(config=None):
 
     #============LOAD================
     #--------------------------------
-    load_checkpoint_path = config.checkpoint.load_path
+    load_checkpoint_path = os.path.abspath(config.checkpoint.load_path)
 
     if (os.path.exists(load_checkpoint_path)):
         checkpoint = torch.load(load_checkpoint_path)
@@ -44,14 +43,14 @@ def main(config=None):
     #============TRAIN===============
     #--------------------------------
     print("Testing...")
-    accuracy, f1 = test(model, dl_test, device)
-    print (f"Accuracy: {accuracy} F1: {f1}")
+    accuracy, weighted_f1 = test(model, dl_test, device)
+    print (f"Accuracy=[{accuracy * 100:.3f}%] Weighted_F1=[{weighted_f1 * 100:.3f}%]")
     print("Testing complete")
 
 
 def test(model, dl_test, device):
     accuracy = 0
-    f1 = 0
+    weighted_f1 = 0
 
     model.eval()
     with torch.inference_mode():
@@ -69,9 +68,10 @@ def test(model, dl_test, device):
             emotion = emotion[mask].flatten().cpu().numpy()
 
             accuracy += accuracy_score(emotion, emotion_predicted)
-            f1 += f1_score(emotion, emotion_predicted, average='weighted')
+            weighted_f1 += f1_score(emotion, emotion_predicted, average='weighted')
 
-    return accuracy/len(dl_test), f1/len(dl_test)
+    num_batches = len(dl_test)
+    return accuracy/num_batches, weighted_f1/num_batches
 
 
 if __name__ == "__main__":

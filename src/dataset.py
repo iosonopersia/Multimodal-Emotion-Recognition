@@ -1,5 +1,5 @@
 import torch
-from utils import apply_padding, get_text
+from utils import get_config, apply_padding, get_text
 import os
 import pickle
 
@@ -7,17 +7,14 @@ import pickle
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, mode="train"):
         super().__init__()
+        config = get_config()
+
         self.mode = mode
 
-        if self.mode == "train":
-            self.text_embeddings = pickle.load(open(os.path.abspath("embeddings/text/train.pkl"), "rb"))
-            self.audio_embeddings = pickle.load(open(os.path.abspath("embeddings/audio/train.pkl"), "rb"))
-        elif self.mode == "val":
-            self.text_embeddings = pickle.load(open(os.path.abspath("embeddings/text/val.pkl"), "rb"))
-            self.audio_embeddings = pickle.load(open(os.path.abspath("embeddings/audio/val.pkl"), "rb"))
-        elif self.mode == "test":
-            self.text_embeddings = pickle.load(open(os.path.abspath("embeddings/text/test.pkl"), "rb"))
-            self.audio_embeddings = pickle.load(open(os.path.abspath("embeddings/audio/test.pkl"), "rb"))
+        text_embeddings_path = os.path.join(os.path.abspath(config.embeddings.text), f"{mode}.pkl")
+        audio_embeddings_path = os.path.join(os.path.abspath(config.embeddings.audio), f"{mode}.pkl")
+        self.text_embeddings = pickle.load(open(text_embeddings_path, "rb"))
+        self.audio_embeddings = pickle.load(open(audio_embeddings_path, "rb"))
 
         self.text = get_text(mode)
 
@@ -67,25 +64,26 @@ class Dataset(torch.utils.data.Dataset):
 
         return {"text": text, "audio": audio, "emotion": emotion}
 
-    def collate_fn(self, batch):
-        # text
-        text = [d["text"].unsqueeze(dim=0) for d in batch]
-        text, _ = apply_padding(text, padding_value=0)
-
-        # audio
-        audio = [d["audio"].unsqueeze(dim=0) for d in batch]
-        audio, _ = apply_padding(audio, padding_value=0)
-
-        # emotion
-        emotion = [torch.stack(d["emotion"], dim=0).unsqueeze(dim=0) for d in batch]
-        emotion, _ = apply_padding(emotion, padding_value=-1) # -1 class index is ignored during loss computation
-        emotion = emotion.squeeze(dim=2)
-
-        # padding mask
-        padding_mask = torch.zeros_like(emotion, dtype=torch.bool)
-        padding_mask[emotion == -1] = True
-
-        return {"text": text, "audio": audio, "emotion": emotion, "padding_mask": padding_mask}
-
     def get_labels(self):
         return self.text["Emotion"].to_numpy()
+
+
+def collate_fn(batch):
+    # text
+    text = [dialogue["text"].unsqueeze(dim=0) for dialogue in batch]
+    text, _ = apply_padding(text)
+
+    # audio
+    audio = [dialogue["audio"].unsqueeze(dim=0) for dialogue in batch]
+    audio, _ = apply_padding(audio)
+
+    # emotion
+    emotion = [torch.stack(dialogue["emotion"], dim=0).unsqueeze(dim=0) for dialogue in batch]
+    emotion, _ = apply_padding(emotion, padding_value=-1) # -1 class index is ignored during loss computation
+    emotion = emotion.squeeze(dim=2)
+
+    # padding mask
+    padding_mask = torch.zeros_like(emotion, dtype=torch.bool)
+    padding_mask[emotion == -1] = True
+
+    return {"text": text, "audio": audio, "padding_mask": padding_mask, "emotion": emotion}
