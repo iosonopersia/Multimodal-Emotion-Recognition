@@ -77,12 +77,16 @@ def save_embeddings(dataloader, model, device, path, mode):
             audio = batch["audio"].to(device)
             lengths = batch["lengths"].to(device)
 
-            embeddings = model(audio, lengths)
-            embeddings = embeddings[0] # embeddings is a tuple of (hidden_states, lengths)
-            embeddings = embeddings[:, 0, :] # [CLS] token
-            embeddings = embeddings.cpu()
+            out = model(audio, lengths)
+            hidden_states = out[0] # (batch_size, seq_len, 768)
+            lengths = out[1] # (batch_size,)
 
-            embeddings_tensor[idx] = embeddings
+            # Mean pooling over non-padded elements:
+            for i, length in enumerate(lengths):
+                hidden_states[i, length:, :] = 0
+            embeddings = torch.sum(hidden_states, dim=1) / lengths.unsqueeze(dim=1).type(torch.float32)
+
+            embeddings_tensor[idx] = embeddings.cpu()
 
     os.makedirs(path, exist_ok=True)
     save_path = os.path.join(os.path.abspath(path), f"{mode}.pkl")

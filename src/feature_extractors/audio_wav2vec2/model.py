@@ -19,8 +19,15 @@ class AudioERC(torch.nn.Module):
             waveforms=input_waveforms,
             lengths=lengths,
         )
-        out = out[0] # out is a tuple of (hidden_states, lengths)
-        out = self.classifier_head(out[:, 0, :])
+        hidden_states = out[0] # (batch_size, seq_len, 768)
+        lengths = out[1] # (batch_size,)
+
+        # Mean pooling over non-padded elements:
+        for i, length in enumerate(lengths):
+            hidden_states[i, length:, :] = 0
+        out = torch.sum(hidden_states, dim=1) / lengths.unsqueeze(dim=1).type(torch.float32)
+
+        out = self.classifier_head(out)
         return out
 
     def freeze(self):
