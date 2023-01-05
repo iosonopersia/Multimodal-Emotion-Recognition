@@ -11,6 +11,17 @@ from transformers import logging
 logging.set_verbosity_error()
 
 
+def extract_roberta_state_dict(checkpoint):
+    roberta_prefix = "roberta."
+    roberta_state_dict = {
+            key.removeprefix(roberta_prefix): value
+            for (key,value) in checkpoint["model_state_dict"].items()
+            if key.startswith(roberta_prefix)
+        }
+
+    return roberta_state_dict
+
+
 def main():
     #CONFIG
     config = get_config()
@@ -43,12 +54,7 @@ def main():
     roberta_checkpoint_path = os.path.abspath(config.checkpoint.save_path)
     if (os.path.exists(roberta_checkpoint_path)):
         checkpoint = torch.load(roberta_checkpoint_path)
-        roberta_prefix = "roberta."
-        roberta_state_dict = {
-            key.removeprefix(roberta_prefix): value
-            for (key,value) in checkpoint["model_state_dict"].items()
-            if key.startswith(roberta_prefix)
-        }
+        roberta_state_dict = extract_roberta_state_dict(checkpoint)
         model.load_state_dict(roberta_state_dict)
     else:
         raise ValueError("Checkpoint not found")
@@ -61,7 +67,7 @@ def main():
 
 
 def save_embeddings(dataloader, model, device, path, mode):
-    embeddings_tensor = torch.zeros(len(dataloader.dataset), model.embeddings_size, dtype=torch.float32)
+    embeddings_tensor = torch.zeros(len(dataloader.dataset), model.config.hidden_size, dtype=torch.float32)
 
     print(f"Saving {mode} embeddings...")
 

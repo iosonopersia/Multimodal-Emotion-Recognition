@@ -11,6 +11,17 @@ from transformers import logging
 logging.set_verbosity_error()
 
 
+def extract_wav2vec2_state_dict(checkpoint):
+    wav2vec2_prefix = "wav2vec2."
+    wav2vec2_state_dict = {
+            key.removeprefix(wav2vec2_prefix): value
+            for (key,value) in checkpoint["model_state_dict"].items()
+            if key.startswith(wav2vec2_prefix)
+        }
+
+    return wav2vec2_state_dict
+
+
 def main():
     #CONFIG
     config = get_config()
@@ -42,12 +53,7 @@ def main():
     checkpoint_path = os.path.abspath(config.checkpoint.save_path)
     if os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
-        wav2vec2_prefix = "wav2vec2."
-        wav2vec2_state_dict = {
-            key.removeprefix(wav2vec2_prefix): value
-            for (key,value) in checkpoint["model_state_dict"].items()
-            if key.startswith(wav2vec2_prefix)
-        }
+        wav2vec2_state_dict = extract_wav2vec2_state_dict(checkpoint)
         model.load_state_dict(wav2vec2_state_dict)
     else:
         raise ValueError("Checkpoint not found")
