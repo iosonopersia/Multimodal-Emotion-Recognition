@@ -1,4 +1,5 @@
 # from tkinter import Image
+import random
 import torch
 from utils import get_text
 import os
@@ -13,26 +14,28 @@ from tqdm import tqdm
 import pandas as pd
 
 
-
 class DatasetMelAudio(torch.utils.data.Dataset):
     def __init__(self, mode="train", config=None, compute_statistics=False):
         super().__init__()
 
-        self.MAX_AUDIO_LENGTH = 42000 # 42000 ms = 42 seconds
-        self.len_triplet_picking = 100
-        self.normalize = transforms.Normalize([0.0,0.0,0.0], [255.0, 255.0, 255.0])
+        self.MAX_AUDIO_LENGTH = 40000 #42000 # 42000 ms = 42 seconds
         self.config = config
 
         self.mode = mode
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
             self.mel_spectogram_cache = "data/MELD.Raw/train_splits/mel_spectograms"
+            self.len_triplet_picking = config.train.data_loader.batch_size
+
         if self.mode == "val":
             self.audio_path = "data/MELD.Raw/dev_splits_complete/wav"
             self.mel_spectogram_cache = "data/MELD.Raw/dev_splits_complete/mel_spectograms"
+            self.len_triplet_picking = config.val.data_loader.batch_size
         if self.mode == "test":
             self.audio_path = "data/MELD.Raw/output_repeated_splits_test/wav"
             self.mel_spectogram_cache = "data/MELD.Raw/output_repeated_splits_test/mel_spectograms"
+            self.len_triplet_picking = config.test.data_loader.batch_size
+
 
         os.makedirs(self.mel_spectogram_cache, exist_ok=True)
         self.text = get_text(mode)
@@ -40,8 +43,8 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             self.text = self.text.iloc[0:self.config.DEBUG.num_samples]
 
         # Map labels to class indices
-        emotion_labels = {"neutral": 0, "joy": 1, "sadness": 2, "anger": 3, "surprise": 4, "fear": 5, "disgust": 6}
-        self.text["Emotion"] = self.text["Emotion"].map(emotion_labels)
+        self.emotion_labels = {"neutral": 0, "joy": 1, "sadness": 2, "anger": 3, "surprise": 4, "fear": 5, "disgust": 6}
+        self.text["Emotion"] = self.text["Emotion"].map(self.emotion_labels)
 
         if mode == "train" and compute_statistics:
             self.max, self.min = self.compute_statistics()
@@ -72,17 +75,56 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         emotion = utterance["Emotion"]
         emotion = torch.tensor([emotion])
 
-        #TODO AUGMENTATION (the audio signal is first processed via different augmentation techniques like time warping and Additive White Gaussian Noise (AWGN) noise)
-
-        audio_mel_spectogram = self.get_mel_spectogram(wav_path)
+        audio_mel_spectogram = self.get_mel_spectogram(wav_path, emotion=emotion)
 
         return {"audio_mel_spectogram": audio_mel_spectogram, "emotion": emotion}
 
 
     def get_labels(self):
         return self.text["Emotion"].to_numpy()
+# from https://github.com/liuxubo717/cl4ac
+    def feature_extraction(self, audio_data: np.ndarray, sr: int, nb_fft: int,
+                       hop_size: int, nb_mels: int, f_min: float,
+                       f_max: float, htk: bool, power: float, norm: bool,
+                       window_function: str, center: bool) -> np.ndarray:
+        """Feature extraction function.
+        :param audio_data: Audio signal.
+        :type audio_data: numpy.ndarray
+        :param sr: Sampling frequency.
+        :type sr: int
+        :param nb_fft: Amount of FFT points.
+        :type nb_fft: int
+        :param hop_size: Hop size in samples.
+        :type hop_size: int
+        :param nb_mels: Amount of MEL bands.
+        :type nb_mels: int
+        :param f_min: Minimum frequency in Hertz for MEL band calculation.
+        :type f_min: float
+        :param f_max: Maximum frequency in Hertz for MEL band calculation.
+        :type f_max: float|None
+        :param htk: Use the HTK Toolbox formula instead of Auditory toolkit.
+        :type htk: bool
+        :param power: Power of the magnitude.
+        :type power: float
+        :param norm: Area normalization of MEL filters.
+        :type norm: bool
+        :param window_function: Window function.
+        :type window_function: str
+        :param center: Center the frame for FFT.
+        :type center: bool
+        :return: Log mel-bands energies of shape=(t, nb_mels)
+        :rtype: numpy.ndarray
+        """
+        y = audio_data/abs(audio_data).max()
+        mel_bands = librosa.feature.melspectrogram(
+            y=y, sr=sr, n_fft=nb_fft, hop_length=hop_size, win_length=nb_fft,
+            window=window_function, center=center, power=power, n_mels=nb_mels,
+            fmin=f_min, fmax=f_max, htk=htk, norm=norm).T
 
-    def get_mel_spectogram(self, audio_path):
+        return np.log(mel_bands + np.finfo(float).eps)
+
+
+    def get_mel_spectogram(self, audio_path, emotion=None):
         '''
         transform audio into 2D Mel Spectrogram (RGB) :
             the Short Time Fourier transform (STFT) is used with the frame length of 400 samples (25 ms) and hop length of
@@ -90,6 +132,42 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             We also use 128 Mel filter banks to generate the Mel Spectrogram
 
         '''
+        input_debug = False
+        save_to_cache = False
+        augmentation = False
+
+        if input_debug:
+            chunk_to_zero = self.MAX_AUDIO_LENGTH // 7
+            if emotion == 0:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, 0:chunk_to_zero] = 0
+            if emotion == 1:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, chunk_to_zero:chunk_to_zero * 2] = 0
+            if emotion == 2:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, chunk_to_zero * 2:chunk_to_zero * 3] = 0
+            if emotion == 3:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, chunk_to_zero * 3:chunk_to_zero * 4] = 0
+            if emotion == 4:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, chunk_to_zero * 4:chunk_to_zero * 5] = 0
+            if emotion == 5:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, chunk_to_zero * 5:chunk_to_zero * 6] = 0
+            if emotion == 6:
+                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio[:, chunk_to_zero * 6:chunk_to_zero * 7] = 0
+
+            audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = 16000, n_fft=400, hop_length=160, n_mels=128)(audio)
+            audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
+            audio_mel_spectogram = (audio_mel_spectogram - self.min) / (self.max - self.min)
+            audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
+
+            return audio_mel_spectogram
+
+
         # take last part of the audio_path
         audio_path_cache = os.path.split(audio_path)[-1]
         # remove extension
@@ -104,40 +182,41 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             audio_mel_spectogram = np.array(audio_mel_spectogram)
             # Convert the NumPy array to a tensor
             audio_mel_spectogram = torch.from_numpy(audio_mel_spectogram).to(torch.float32) / 255
-
-            # plt.imshow( audio_mel_spectogram )
-            # audio_mel_spectogram = Image.open(audio_path_cache)
-            audio_mel_spectogram = audio_mel_spectogram.permute(2, 0, 1)
+            audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
+            # plt.imshow( audio_mel_spectogram.permute(1,2,0).detach().cpu().numpy())
             return audio_mel_spectogram
 
         audio, sr = torchaudio.load(audio_path, format="wav", normalize=True)
+        if augmentation and self.mode=="train":
+            noise = torch.randn(size=(audio.shape[0], audio.shape[1])) / 300
+            audio = audio + noise
         audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH - audio.shape[1]), mode='constant', value=0)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = sr, n_fft=400, hop_length=160, n_mels=128)(audio)
-            audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
-            # normalize between 0 and 1
-            audio_mel_spectogram = (audio_mel_spectogram - (self.min)) / (self.max - self.min)
-
-        # transform to RGB image
-        audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
-
+        # with warnings.catch_warnings():
+        #     warnings.simplefilter("ignore")
+        #     audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = sr, n_fft=400, hop_length=160, n_mels=128)(audio)
+        #     audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
+        #     # normalize between 0 and 1
+        #     audio_mel_spectogram = (audio_mel_spectogram - self.min) / (self.max - self.min)
+        audio_mel_spectogram = self.feature_extraction(audio.numpy(), sr, hop_size=160, nb_fft=400, nb_mels=128, norm=1, power=1, center=True, htk=False, f_min=0, f_max=None, window_function="hann")
+        audio_mel_spectogram = torch.tensor(audio_mel_spectogram).permute(2,0,1)
+        audio_mel_spectogram = (audio_mel_spectogram - audio_mel_spectogram.min()) / (audio_mel_spectogram.max() - audio_mel_spectogram.min())
 
         # save to cache
-        audio_mel_spectogram_save = audio_mel_spectogram.permute(1, 2, 0) * 255
-        # plt.imshow( audio_mel_spectogram_save )
-        audio_mel_spectogram_save = audio_mel_spectogram_save.numpy()
-        # plt.imshow( audio_mel_spectogram_save )
-        audio_mel_spectogram_save = audio_mel_spectogram_save.astype(np.uint8)
-        # plt.imshow( audio_mel_spectogram_save )
+        if save_to_cache:
+            audio_mel_spectogram_save = audio_mel_spectogram.permute(1, 2, 0) * 255
+            # plt.imshow( audio_mel_spectogram_save )
+            audio_mel_spectogram_save = audio_mel_spectogram_save.numpy()
+            # plt.imshow( audio_mel_spectogram_save )
+            audio_mel_spectogram_save = audio_mel_spectogram_save.astype(np.uint8)
+            # plt.imshow( audio_mel_spectogram_save )
 
-        audio_mel_spectogram_save = Image.fromarray(audio_mel_spectogram_save)
-        audio_mel_spectogram_save.save(audio_path_cache, mode="L")
+            audio_mel_spectogram_save = Image.fromarray(audio_mel_spectogram_save.squeeze(), mode="L")
+            audio_mel_spectogram_save.save(audio_path_cache, mode="L")
+
+        audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
 
         # plot
         # plt.imshow( audio_mel_spectogram.permute(1, 2, 0) )
-        # plt.imshow( audio_mel_spectogram_save )
-
 
         return audio_mel_spectogram
 
@@ -146,7 +225,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         return distance
 
     @torch.no_grad()
-    def get_batched_triplets(self, batch_size, model, mining_type="random", margin=0.2):
+    def get_batched_triplets(self, batch_size, model, mining_type="random", margin=1):
         '''
         mining_type = "hard", "semi-hard", "random"
         '''
@@ -163,30 +242,32 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             # take batch_size valid triples
             for i in range(batch_size):
                 #anchors
-                anchor_utterance = self.text.sample()
+                # for imbalance dataset
+                emotion = random.choice(list(self.emotion_labels.values()))
+                anchor_utterance = self.text[self.text["Emotion"]==emotion].sample()
                 while (self.check_valid(anchor_utterance) == False):
-                    anchor_utterance = self.text.sample()
+                    anchor_utterance=self.text[self.text["Emotion"]==emotion].sample()
                 anchor_dialogue_id = anchor_utterance["Dialogue_ID"].iloc[0]
                 anchor_utterance_id = anchor_utterance["Utterance_ID"].iloc[0]
-                anchor = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{anchor_dialogue_id}_utt{anchor_utterance_id}.wav"))
+                anchor = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{anchor_dialogue_id}_utt{anchor_utterance_id}.wav"), anchor_utterance["Emotion"].iloc[0])
                 anchors.append(anchor)
 
                 # positives
-                positive_utterance = self.text.sample()
-                while (self.check_valid(positive_utterance) == False) or (positive_utterance["Emotion"].iloc[0] != anchor_utterance["Emotion"].iloc[0]):
-                    positive_utterance = self.text.sample()
+                positive_utterance = self.text[self.text["Emotion"]==emotion].sample()
+                while (self.check_valid(positive_utterance) == False) or (positive_utterance["Emotion"].iloc[0] != anchor_utterance["Emotion"].iloc[0]) or (positive_utterance["Dialogue_ID"].iloc[0]  == anchor_utterance["Dialogue_ID"].iloc[0]  and positive_utterance["Utterance_ID"].iloc[0]  == anchor_utterance["Utterance_ID"].iloc[0] ):
+                    positive_utterance = self.text[self.text["Emotion"]==emotion].sample()
                 positive_dialogue_id = positive_utterance["Dialogue_ID"].iloc[0]
                 positive_utterance_id = positive_utterance["Utterance_ID"].iloc[0]
-                positive = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{positive_dialogue_id}_utt{positive_utterance_id}.wav"))
+                positive = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{positive_dialogue_id}_utt{positive_utterance_id}.wav"), positive_utterance["Emotion"].iloc[0])
                 positives.append(positive)
 
                 # negatives
-                negative_utterance = self.text.sample()
+                negative_utterance = self.text[self.text["Emotion"]!=emotion].sample()
                 while (self.check_valid(negative_utterance) == False) or (negative_utterance["Emotion"].iloc[0] == anchor_utterance["Emotion"].iloc[0]):
-                    negative_utterance = self.text.sample()
+                    negative_utterance = self.text[self.text["Emotion"]!=emotion].sample()
                 negative_dialogue_id = negative_utterance["Dialogue_ID"].iloc[0]
                 negative_utterance_id = negative_utterance["Utterance_ID"].iloc[0]
-                negative = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{negative_dialogue_id}_utt{negative_utterance_id}.wav"))
+                negative = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{negative_dialogue_id}_utt{negative_utterance_id}.wav"),  negative_utterance["Emotion"].iloc[0])
                 negatives.append(negative)
             anchors = torch.stack(anchors)
             positives = torch.stack(positives)
@@ -204,28 +285,32 @@ class DatasetMelAudio(torch.utils.data.Dataset):
                 while hard_negative == False:
                     count += 1
                     #anchors
-                    anchor_utterance = self.text.sample()
+                    # for imbalance dataset
+                    emotion = random.choice(list(self.emotion_labels.values()))
+                    anchor_utterance = self.text[self.text["Emotion"]==emotion].sample()
                     while (self.check_valid(anchor_utterance) == False):
                         anchor_utterance = self.text.sample()
                     anchor_dialogue_id = anchor_utterance["Dialogue_ID"].iloc[0]
                     anchor_utterance_id = anchor_utterance["Utterance_ID"].iloc[0]
-                    anchor = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{anchor_dialogue_id}_utt{anchor_utterance_id}.wav"))
+                    anchor = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{anchor_dialogue_id}_utt{anchor_utterance_id}.wav"), anchor_utterance["Emotion"].iloc[0])
 
                     # positives
-                    positive_utterance = self.text.sample()
-                    while (self.check_valid(positive_utterance) == False) or (positive_utterance["Emotion"].iloc[0] != anchor_utterance["Emotion"].iloc[0]):
-                        positive_utterance = self.text.sample()
+                    positive_utterance = self.text[self.text["Emotion"]==emotion].sample()
+                    while (self.check_valid(positive_utterance) == False) or (positive_utterance["Emotion"].iloc[0] != anchor_utterance["Emotion"].iloc[0]) or (positive_utterance["Dialogue_ID"].iloc[0] == anchor_utterance["Dialogue_ID"].iloc[0]  and positive_utterance["Utterance_ID"].iloc[0]  == anchor_utterance["Utterance_ID"].iloc[0] ):
+                        positive_utterance = self.text[self.text["Emotion"]==emotion].sample()
+
                     positive_dialogue_id = positive_utterance["Dialogue_ID"].iloc[0]
                     positive_utterance_id = positive_utterance["Utterance_ID"].iloc[0]
-                    positive = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{positive_dialogue_id}_utt{positive_utterance_id}.wav"))
+                    positive = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{positive_dialogue_id}_utt{positive_utterance_id}.wav"), positive_utterance["Emotion"].iloc[0])
 
 
-                    negative_utterance = self.text.sample()
+                    negative_utterance = self.text[self.text["Emotion"]!=emotion].sample()
                     while (self.check_valid(negative_utterance) == False) or (negative_utterance["Emotion"].iloc[0] == anchor_utterance["Emotion"].iloc[0]):
-                        negative_utterance = self.text.sample()
+                        negative_utterance = self.text[self.text["Emotion"]!=emotion].sample()
+
                     negative_dialogue_id = negative_utterance["Dialogue_ID"].iloc[0]
                     negative_utterance_id = negative_utterance["Utterance_ID"].iloc[0]
-                    negative = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{negative_dialogue_id}_utt{negative_utterance_id}.wav"))
+                    negative = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{negative_dialogue_id}_utt{negative_utterance_id}.wav"), negative_utterance["Emotion"].iloc[0])
 
                     anchor_embedding = model(anchor.unsqueeze(0).to(device))
                     positive_embedding = model(positive.unsqueeze(0).to(device))
@@ -261,7 +346,8 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         random_audio_mel_spectograms = []
         self.len_triplet_picking = (self.len_triplet_picking // batch_size) * batch_size
         while i < self.len_triplet_picking:
-            random_utterance = self.text.sample()
+            emotion = random.choice(list(self.emotion_labels.values()))
+            random_utterance = self.text[self.text["Emotion"]==emotion].sample()
             random_dialogue_id = random_utterance["Dialogue_ID"].iloc[0]
             random_utterance_id = random_utterance["Utterance_ID"].iloc[0]
             if self.check_valid(random_utterance)==False:
@@ -273,7 +359,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             random_wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{random_dialogue_id}_utt{random_utterance_id}.wav")
 
             # Get mel spectogram
-            random_audio_mel_spectogram = self.get_mel_spectogram(random_wav_path)
+            random_audio_mel_spectogram = self.get_mel_spectogram(random_wav_path, random_utterance["Emotion"].iloc[0])
 
             random_audio_mel_spectograms.append(random_audio_mel_spectogram)
 
@@ -309,7 +395,6 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         # get the index of the min value in the distance matrix negative
         negative_index = torch.argmin(distance_matrix_negative, dim=1)
 
-
         # BATCH
         losses = torch.tensor( [distance_matrix[index,p] - distance_matrix[index, n] for index,(p,n) in enumerate(zip(positive_index, negative_index))])
 
@@ -336,9 +421,9 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             n_wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{n_dialogue_id}_utt{n_utterance_id}.wav")
 
             # Get mel spectogram
-            index_audio_mel_spectogram = self.get_mel_spectogram(index_wav_path)
-            p_audio_mel_spectogram = self.get_mel_spectogram(p_wav_path)
-            n_audio_mel_spectogram = self.get_mel_spectogram(n_wav_path)
+            index_audio_mel_spectogram = self.get_mel_spectogram(index_wav_path, index_utterance["Emotion"].iloc[0])
+            p_audio_mel_spectogram = self.get_mel_spectogram(p_wav_path, p_utterance["Emotion"].iloc[0])
+            n_audio_mel_spectogram = self.get_mel_spectogram(n_wav_path, n_utterance["Emotion"].iloc[0])
 
             anchor.append(index_audio_mel_spectogram)
             positive.append(p_audio_mel_spectogram)
@@ -399,8 +484,6 @@ class DatasetMelAudio(torch.utils.data.Dataset):
                 return False
         return True
 
-
-
     def compute_statistics(self):
             # compute statistics
         max_value = 0
@@ -431,8 +514,6 @@ if __name__ == "__main__":
 
     dataset = DatasetMelAudio(mode="train")
     print(dataset[0])
-
-
 
     # dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
     # for batch in dataloader:
