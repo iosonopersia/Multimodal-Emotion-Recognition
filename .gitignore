@@ -3,6 +3,7 @@ mp4towaw_log.txt
 .stderr
 .stdout
 wandb/
+visualization
 
 # Model checkpoints
 checkpoints/
