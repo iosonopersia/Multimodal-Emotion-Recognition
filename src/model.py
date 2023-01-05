@@ -45,6 +45,8 @@ class M2FNet(nn.Module):
         hidden_size_classifier = config.CLASSIFIER.HIDDEN_SIZE
         output_size = config.OUTPUT_SIZE
 
+        self.dropout = nn.Dropout(dropout)
+
         # Audio encoders
         audio_encoder_layer = nn.TransformerEncoderLayer(d_model=d_model_audio, nhead=self.n_head_audio, dropout=dropout)
         audio_encoder_norm = nn.LayerNorm(d_model_audio)
@@ -71,13 +73,14 @@ class M2FNet(nn.Module):
             for _ in range(n_fam_layers)])
 
         # Output layers
-        classifier_head = [nn.Linear(d_model_text + d_model_audio, hidden_size_classifier)]
+        classifier_head = [nn.Linear(2*d_model_fam, hidden_size_classifier)]
         if n_layers_classifier > 2:
             for _ in range(n_layers_classifier - 2):
                 classifier_head.append(nn.ReLU())
                 classifier_head.append(nn.Linear(hidden_size_classifier, hidden_size_classifier))
 
         classifier_head.append(nn.ReLU())
+        classifier_head.append(self.dropout)
         classifier_head.append(nn.Linear(hidden_size_classifier, output_size))
 
         self.output_layer = nn.Sequential(*classifier_head)
@@ -99,11 +102,14 @@ class M2FNet(nn.Module):
 
         # Projection layers
         audio = self.audio_proj(audio)
+        audio = self.dropout(audio)
         text = self.text_proj(text)
+        text = self.dropout(text)
 
         # Fusion Attention layers
-        for fusion_layer in self.fusion_layers:
-            text = fusion_layer(text=text, audio=audio, key_padding_mask=mask)
+        # for fusion_layer in self.fusion_layers:
+        #     text = fusion_layer(text=text, audio=audio, key_padding_mask=mask)
+        #     text = self.dropout(text)
 
         # Concatenation layer
         x = torch.cat((audio, text), dim=2)
