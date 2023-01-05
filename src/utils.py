@@ -55,6 +55,7 @@ def get_text (mode="train"):
     elif mode == "test":
         df = df[(df["Dialogue_ID"] != 38) | (df["Utterance_ID"] != 4)]
         df = df[(df["Dialogue_ID"] != 220) | (df["Utterance_ID"] != 0)]
+    df = df.reset_index(drop=True)
 
     # Convert encoding from cp1252 to utf-8
     cp1252_to_utf8 = {
