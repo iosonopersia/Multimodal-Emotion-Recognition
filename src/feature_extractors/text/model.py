@@ -7,10 +7,13 @@ from transformers.models.roberta.modeling_roberta import (
 
 
 class TextERC(torch.nn.Module):
-    def __init__(self, num_classes=7):
+    def __init__(self, pretrained_model='roberta-base', num_classes=7):
         super().__init__()
-        config = RobertaConfig.from_pretrained('roberta-large', num_labels=num_classes)
-        self.roberta = RobertaModel.from_pretrained('roberta-large', add_pooling_layer=False, config=config)
+        self.is_frozen = False
+        config = RobertaConfig.from_pretrained(pretrained_model, num_labels=num_classes)
+        self.embeddings_size = config.hidden_size
+
+        self.roberta = RobertaModel.from_pretrained(pretrained_model, add_pooling_layer=False, config=config)
         self.classifier_head = RobertaClassificationHead(config)
 
     def forward(self, input_ids, attention_mask):
@@ -25,9 +28,13 @@ class TextERC(torch.nn.Module):
         return out
 
     def freeze(self):
-        for param in self.roberta.parameters():
-            param.requires_grad = False
+        if not self.is_frozen:
+            for param in self.wav2vec2.parameters():
+                param.requires_grad = False
+            self.is_frozen = True
 
     def unfreeze(self):
-        for param in self.roberta.parameters():
-            param.requires_grad = True
+        if self.is_frozen:
+            for param in self.wav2vec2.parameters():
+                param.requires_grad = True
+            self.is_frozen = False

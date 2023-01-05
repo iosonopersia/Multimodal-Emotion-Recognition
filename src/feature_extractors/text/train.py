@@ -1,7 +1,7 @@
 import os
 import torch
 import wandb
-from dataset import Dataset
+from dataset import Dataset, collate_fn
 from model import TextERC
 from tqdm import tqdm
 from datetime import datetime
@@ -27,15 +27,18 @@ def main(config=None):
     #------------------------------------
     # TRAIN DATA
     data_train = Dataset(mode="train")
-
     train_dl_cfg = config.train.data_loader
-    dl_train = torch.utils.data.DataLoader(data_train, collate_fn=data_train.collate_fn, **train_dl_cfg)
+    dl_train = torch.utils.data.DataLoader(data_train, collate_fn=collate_fn, **train_dl_cfg)
 
     # VAL DATA
     data_val = Dataset(mode="val")
-
     val_dl_cfg = config.val.data_loader
-    dl_val = torch.utils.data.DataLoader(data_val, collate_fn=data_val.collate_fn, **val_dl_cfg)
+    dl_val = torch.utils.data.DataLoader(data_val, collate_fn=collate_fn, **val_dl_cfg)
+
+    # TEST DATA
+    data_test = Dataset(mode="test")
+    test_dl_cfg = config.test.data_loader
+    dl_test = torch.utils.data.DataLoader(data_test, collate_fn=collate_fn, **test_dl_cfg)
 
     #============MODEL===============
     #--------------------------------
@@ -86,6 +89,7 @@ def main(config=None):
         model,
         dl_train,
         dl_val,
+        dl_test,
         criterion,
         optimizer,
         frozen_epochs_optimizer,
@@ -96,7 +100,7 @@ def main(config=None):
     print("Training complete")
 
 
-def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_optimizer, lr_scheduler, config, device):
+def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen_epochs_optimizer, lr_scheduler, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -158,6 +162,12 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
             device)
         val_losses_values.append(loss_val)
 
+        loss_test, accuracy_test, weighted_f1_test = validate(
+            model,
+            dl_test,
+            criterion,
+            device)
+
         if save_checkpoint:
             torch.save({
                 'epoch': epoch + 1,
@@ -172,7 +182,11 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_o
                 'Train/Loss': loss_train,
                 'Validation/Loss': loss_val,
                 'Validation/Accuracy': accuracy,
-                'Validation/Weighted_F1': weighted_f1})
+                'Validation/Weighted_F1': weighted_f1,
+                'Test/Loss': loss_test,
+                'Test/Accuracy': accuracy_test,
+                'Test/Weighted_F1': weighted_f1_test,
+            })
 
         # Early stopping
         if early_stopping:
@@ -207,12 +221,10 @@ def train(model, dl_train, criterion, optimizer, lr_scheduler, is_frozen_epoch, 
     loss_train = 0
 
     model.train()
-    for idx_batch, data in tqdm(enumerate(dl_train), total=len(dl_train)):
-        text, emotion, attention_mask = data["text"], data["emotion"], data["attention_mask"]
-
-        text = text.to(device)
-        emotion = emotion.to(device)
-        attention_mask = attention_mask.to(device)
+    for idx_batch, batch in tqdm(enumerate(dl_train), total=len(dl_train)):
+        text = batch["text"].to(device)
+        emotion = batch["emotion"].to(device)
+        attention_mask = batch["attention_mask"].to(device)
 
         optimizer.zero_grad()
         outputs = model(text, attention_mask)
@@ -243,12 +255,10 @@ def validate(model, dl_val, criterion, device):
 
     model.eval()
     with torch.inference_mode():
-        for data in tqdm(dl_val, total=len(dl_val)):
-            text, emotion, attention_mask = data["text"], data["emotion"], data["attention_mask"]
-
-            text = text.to(device)
-            emotion = emotion.to(device)
-            attention_mask = attention_mask.to(device)
+        for batch in tqdm(dl_val, total=len(dl_val)):
+            text = batch["text"].to(device)
+            emotion = batch["emotion"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
 
             outputs = model(text, attention_mask)
             loss = criterion(outputs, emotion)
@@ -261,7 +271,8 @@ def validate(model, dl_val, criterion, device):
 
             loss_eval += loss.item()
 
-    return loss_eval/len(dl_val), accuracy/len(dl_val), weighted_f1/len(dl_val)
+    num_batches = len(dl_val)
+    return loss_eval/num_batches, accuracy/num_batches, weighted_f1/num_batches
 
 
 if __name__ == "__main__":

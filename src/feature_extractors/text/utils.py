@@ -13,7 +13,7 @@ def get_config():
     return config
 
 
-def get_text (mode="train"):
+def get_text(mode="train"):
     """Returns the transcripts for the given mode (train, val, test)."""
     assert mode in ["train", "val", "test"]
     root = os.path.join(os.path.abspath("data"), "MELD.Raw")

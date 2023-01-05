@@ -6,8 +6,8 @@ from transformers import RobertaTokenizer
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, mode="train"):
         super().__init__()
-
-        self.roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        self.sep_token = roberta_tokenizer.sep_token
 
         self.mode = mode
 
@@ -27,27 +27,29 @@ class Dataset(torch.utils.data.Dataset):
         df_row = self.text.iloc[idx]
 
         # Text
-        separator = self.roberta_tokenizer.sep_token
-        text = get_utterance_with_context(self.text, idx, separator)
+        text = get_utterance_with_context(self.text, idx, self.sep_token)
 
         # Emotion
         emotion = int(df_row["Emotion"])
 
         return {"idx": idx, "text": text, "emotion": emotion}
 
-    def collate_fn(self, batch):
-        # idx
-        idx = [d["idx"] for d in batch]
-
-        # text
-        text = self.roberta_tokenizer([d["text"] for d in batch], return_tensors="pt", padding="longest", truncation=True, max_length=512)
-        attention_mask = text["attention_mask"].long()
-        text = text["input_ids"].long()
-
-        # emotion
-        emotion = torch.tensor([d["emotion"] for d in batch], dtype=torch.int64)
-
-        return {"idx": idx, "text": text, "attention_mask": attention_mask, "emotion": emotion}
-
     def get_labels(self):
         return self.text["Emotion"].to_numpy()
+
+
+def collate_fn(batch):
+    roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+
+    # idx
+    idx = [dialogue["idx"] for dialogue in batch]
+
+    # text
+    text = roberta_tokenizer([dialogue["text"] for dialogue in batch], return_tensors="pt", padding="longest", truncation=True, max_length=512)
+    attention_mask = text["attention_mask"].long()
+    text = text["input_ids"].long()
+
+    # emotion
+    emotion = torch.tensor([dialogue["emotion"] for dialogue in batch], dtype=torch.int64)
+
+    return {"idx": idx, "text": text, "attention_mask": attention_mask, "emotion": emotion}

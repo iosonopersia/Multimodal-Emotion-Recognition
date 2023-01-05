@@ -1,7 +1,7 @@
 import os
 import torch
 from utils import get_config
-from dataset import Dataset
+from dataset import Dataset, collate_fn
 from tqdm import tqdm
 from transformers import RobertaModel
 import pickle
@@ -32,13 +32,13 @@ def main():
     data_val = Dataset(mode="val")
     data_test = Dataset(mode="test")
 
-    dl_train = torch.utils.data.DataLoader(data_train, collate_fn=data_train.collate_fn, **dataloader_config)
-    dl_val = torch.utils.data.DataLoader(data_val, collate_fn=data_val.collate_fn, **dataloader_config)
-    dl_test = torch.utils.data.DataLoader(data_test, collate_fn=data_test.collate_fn, **dataloader_config)
+    dl_train = torch.utils.data.DataLoader(data_train, collate_fn=collate_fn, **dataloader_config)
+    dl_val = torch.utils.data.DataLoader(data_val, collate_fn=collate_fn, **dataloader_config)
+    dl_test = torch.utils.data.DataLoader(data_test, collate_fn=collate_fn, **dataloader_config)
 
     #============MODEL===============
     #--------------------------------
-    model = RobertaModel.from_pretrained('roberta-large', add_pooling_layer=False)
+    model = RobertaModel.from_pretrained('roberta-base', add_pooling_layer=False)
 
     roberta_checkpoint_path = os.path.abspath(config.checkpoint.save_path)
     if (os.path.exists(roberta_checkpoint_path)):
@@ -61,7 +61,7 @@ def main():
 
 
 def save_embeddings(dataloader, model, device, path, mode):
-    embeddings_tensor = torch.zeros(len(dataloader.dataset), 768, dtype=torch.float32)
+    embeddings_tensor = torch.zeros(len(dataloader.dataset), model.embeddings_size, dtype=torch.float32)
 
     print(f"Saving {mode} embeddings...")
 
