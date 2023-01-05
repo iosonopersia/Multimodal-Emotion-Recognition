@@ -31,17 +31,11 @@ def main(config=None):
     # TRAIN DATA
     data_train = Dataset(mode="train", config=config)
 
-    # train_dl_cfg = config.train.data_loader
-    # dl_train = torch.utils.data.DataLoader(data_train, **train_dl_cfg)
-
     # VAL DATA
     data_val = Dataset(mode="val", config=config)
 
-    # val_dl_cfg = config.val.data_loader
-    # dl_val = torch.utils.data.DataLoader(data_val, **val_dl_cfg)
-
     # TEST DATA
-    data_test = Dataset(mode="test", config=config)
+    data_test = Dataset(mode="train", config=config)
 
     test_dl_cfg = config.test.data_loader
     dl_test = torch.utils.data.DataLoader(data_test, **test_dl_cfg)
@@ -105,6 +99,7 @@ def main(config=None):
             model,
             data_train,
             data_val,
+            dl_test,
             criterion,
             optimizer,
             lr_scheduler,
@@ -115,10 +110,10 @@ def main(config=None):
         )
         print("Training complete")
     if config.DEBUG.visualize:
-        visualize_model(model, dl_test, device, config.DEBUG.visualization_type)
+        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, save=False, visualize=True)
 
 
-def training_loop(model, data_train, data_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
+def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_scheduler, start_epoch, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -165,6 +160,8 @@ def training_loop(model, data_train, data_val, criterion, optimizer, lr_schedule
             criterion,
             device)
         val_losses_values.append(loss_val)
+
+        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False)
 
         if save_checkpoint:
             os.makedirs(save_checkpoint_path.rsplit("/", 1)[0], exist_ok=True)
@@ -221,8 +218,8 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     n_steps = len(data_train) // batch_size
     for idx_batch in tqdm(range(n_steps), "Training epoch {}".format(epoch)):
         with torch.inference_mode():
-            if epoch < 20:
-                data = data_train.get_batched_triplets(batch_size, model, mining_type="semi-hard")
+            if epoch < 40:
+                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard") #semi-hard
             else:
                 data = data_train.get_batched_triplets(batch_size, model, mining_type="hard")
 
@@ -236,9 +233,8 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
         negative_embedding = model(negative)
         loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
 
-
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         loss_train += loss.item()
@@ -271,7 +267,7 @@ def validate(model, data_val, criterion, device):
 
     return loss_eval / n_steps
 
-def visualize_model (model, dl_test, device, visualization_type= "3D"):
+def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, save=True, visualize=False):
     if visualization_type == "3D":
         tsne = TSNE(n_components=3)
     elif visualization_type == "2D":
@@ -291,8 +287,6 @@ def visualize_model (model, dl_test, device, visualization_type= "3D"):
                 embeddings.append(outputs[j].cpu().detach().numpy())
                 true_labels.append(labels[j].item())
     # visualize embeddings
-    # Extract the x, y, and z coordinates of the 3D embeddings
-    # embeddings = tsne.fit_transform(np.array(embeddings))
     embeddings = PCA(random_state=0).fit_transform(np.array(embeddings))[:,:50]
     embeddings = tsne.fit_transform(np.array(embeddings))
 
@@ -309,10 +303,19 @@ def visualize_model (model, dl_test, device, visualization_type= "3D"):
         fig = px.scatter(x=x, y=y, text=true_labels, color=true_labels, opacity=0.7, width=800, height=800)
 
     # Show the plot
-    fig.show()
-
-
-
+    # fig.show()
+    save_dir_png = os.path.join("src","feature_extractors","audio_mel", "visualization", "png")
+    save_dir_html = os.path.join("src","feature_extractors","audio_mel", "visualization", "html")
+    # check if directory exists and create it if not
+    if not os.path.exists(save_dir_png):
+        os.makedirs(save_dir_png)
+    if not os.path.exists(save_dir_html):
+        os.makedirs(save_dir_html)
+    if save:
+        fig.write_html(os.path.join(save_dir_html, f"visualization_{epoch}.html"))
+        fig.write_image(os.path.join(save_dir_png, f"visualization_{epoch}.png"))
+    if visualize:
+        fig.show()
 
 if __name__ == "__main__":
     main()
