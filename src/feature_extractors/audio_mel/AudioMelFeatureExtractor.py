@@ -19,6 +19,7 @@ class AudioMelFeatureExtractor(nn.Module):
         self.projector = nn.Sequential(
             nn.ReLU(),
             nn.Linear(512, 256),
+            nn.Dropout(0.5),
             nn.ReLU(),
             nn.Linear(256, 300)
         )
@@ -44,6 +45,12 @@ class TestAudioExtractor(nn.Module):
         self.classifier = nn.Sequential(
             nn.ReLU(),
             nn.Linear(300, 128),
+            # nn.ReLU(),
+            # nn.Linear(1024, 512),
+            # nn.ReLU(),
+            # nn.Linear(512, 256),
+            # nn.ReLU(),
+            # nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -65,14 +72,14 @@ class M2FnetLossAudioMEL(nn.Module):
         if self.adaptive:
             self.triplet_loss = AdaptiveTripletMarginLoss()
         else:
-            self.triplet_loss = torch.nn.TripletMarginLoss(margin=0.2, p=2)
+            self.triplet_loss = torch.nn.TripletMarginLoss(margin=1.0, p=2)
 
         self.covariance_loss = CovarianceLoss()
         self.variance_loss = VarianceLoss()
 
 
     def forward(self, anchor, positive, negative):
-        loss = 20 * self.triplet_loss(anchor, positive, negative)
+        loss =  20 * self.triplet_loss(anchor, positive, negative)
         if self.covariance:
             loss += 5 * self.covariance_loss(anchor, positive, negative)
         if self.variance:
