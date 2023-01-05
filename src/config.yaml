@@ -3,13 +3,9 @@ AUDIO:
     ffmpeg_sr: 16000
     wav2vec_sr: 16000
 
-feature_extractors:
-    text:
-        checkpoint: checkpoints/text/roberta-base # Alternatively, 'roberta-base'
-    audio_MEL:
-        checkpoint: checkpoints/audio_MEL/resnet18-mel # Alternatively, 'facebook/wav2vec2-base-960h'
-    audio_wav2vec:
-        checkpoint: checkpoints/audio_wav2vec/wav2vec # Alternatively, 'facebook/wav2vec2-base-960h'
+embeddings:
+    text: embeddings/text_large
+    audio: embeddings/audio_wav2vec2
 
 checkpoint:
     save_path: checkpoints/m2fnet.pth
@@ -20,8 +16,8 @@ checkpoint:
 solver:
     loss_fn: CE
     balance_classes: False
-    lr: 5.0e-4
-    weight_decay: 5.0e-5
+    lr: 1.0e-4
+    weight_decay: 0.01
     epochs: 100
     scheduler:
         enabled: False
@@ -29,20 +25,20 @@ solver:
         gamma: 0.98
     early_stopping:
         enabled: False
-        patience: 10
+        patience: 5
         restore_best_weights: True
 
 model:
     DROPOUT: 0.4
     AUDIO:
-        EMBEDDING_SIZE: 300
-        N_HEAD: 8
-        N_LAYERS: 1
-        N_ENCODERS: 1
-    TEXT:
         EMBEDDING_SIZE: 768
         N_HEAD: 8
-        N_LAYERS: 1
+        N_LAYERS: 6
+        N_ENCODERS: 1
+    TEXT:
+        EMBEDDING_SIZE: 1024
+        N_HEAD: 8
+        N_LAYERS: 6
         N_ENCODERS: 1
     FAM:
         EMBEDDING_SIZE: 768
@@ -50,28 +46,28 @@ model:
         N_LAYERS: 5
     CLASSIFIER:
         N_LAYERS: 2
-        HIDDEN_SIZE: 64
+        HIDDEN_SIZE: 128
     OUTPUT_SIZE: 7
 
 train:
     data_loader:
         shuffle: True
-        batch_size: 4
-        num_workers: 0
+        batch_size: 32
+        num_workers: 2
         pin_memory: True
 
 val:
     data_loader:
         shuffle: False
-        batch_size: 4
-        num_workers: 0
+        batch_size: 32
+        num_workers: 2
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
-        batch_size: 4
-        num_workers: 0
+        batch_size: 32
+        num_workers: 2
         pin_memory: True
 
 wandb:
