@@ -1,6 +1,34 @@
-import os
+from munch import Munch
+import torch
 import pandas as pd
+import os
 
+config = None
+
+def get_config():
+    global config
+    if config is None:
+        with open('./src/config.yaml', 'rt', encoding='utf-8') as f:
+            config = Munch.fromYAML(f.read())
+    return config
+
+def apply_padding(tensors_list, padding_value=0):
+    """Applies padding to a list of tensors.
+
+    Args:
+        tensors_list (list): list of tensors to pad
+        padding_value (int): value to use for padding
+
+    Returns:
+        tuple: tuple containing:
+            - **padded_tensors** (torch.Tensor): tensor of shape (batch_size, max_seq_len, ...) containing the padded tensors
+            - **tensors_lengths** (torch.Tensor): tensor of shape (batch_size, ) containing the length of each tensor"""
+
+    tensors_lengths = torch.tensor([t.shape[1] for t in tensors_list], dtype=torch.int64)
+    max_len = tensors_lengths.max()
+    padded_tensors = [torch.nn.functional.pad(t, pad=(0, 0, 0, max_len - t.shape[1]), value=padding_value) for t in tensors_list]
+
+    return torch.cat(padded_tensors, dim=0), tensors_lengths
 
 def get_text (mode="train"):
     """Returns the transcripts for the given mode (train, val, test)."""
@@ -43,45 +71,3 @@ def get_text (mode="train"):
         df["Utterance"] = df["Utterance"].map(lambda x: x.replace(key, value))
 
     return df
-
-def get_utterance_with_context(df, idx, separator):
-    main_utterance_row = df.iloc[idx]
-    dialogue_id = int(main_utterance_row["Dialogue_ID"])
-    main_utterance_id = int(main_utterance_row["Utterance_ID"])
-
-    dialogue = df[df["Dialogue_ID"] == dialogue_id]
-    dia_utt_ids = sorted(dialogue["Utterance_ID"].to_list())
-    try:
-        main_utt_idx_in_dialogue = dia_utt_ids.index(main_utterance_id)
-    except ValueError:
-        raise ValueError(f"Utterance ID {main_utterance_id} not found in dialogue ID {dialogue_id}")
-    prev_utterance_id = dia_utt_ids[main_utt_idx_in_dialogue - 1] if main_utt_idx_in_dialogue > 0 else None
-    next_utterance_id = dia_utt_ids[main_utt_idx_in_dialogue + 1] if main_utt_idx_in_dialogue < len(dia_utt_ids) - 1 else None
-
-    # Concatenate the previous and next utterances
-    utterance_with_context = main_utterance_row["Utterance"]
-
-    if prev_utterance_id is not None:
-        prev_utterance_row = dialogue[dialogue["Utterance_ID"] == prev_utterance_id].iloc[0]
-        prev_utterance = prev_utterance_row["Utterance"]
-        utterance_with_context = f"{prev_utterance} {separator} {utterance_with_context}"
-    else:
-        utterance_with_context = f"{separator} {utterance_with_context}"
-
-    if next_utterance_id is not None:
-        next_utterance_row = dialogue[dialogue["Utterance_ID"] == next_utterance_id].iloc[0]
-        next_utterance = next_utterance_row["Utterance"]
-        utterance_with_context = f"{utterance_with_context} {separator} {next_utterance}"
-    else:
-        utterance_with_context = f"{utterance_with_context} {separator}"
-
-    return utterance_with_context
-
-
-if __name__ == "__main__":
-
-    # Test get_text function
-    df = get_text()
-    print(df.head())
-
-

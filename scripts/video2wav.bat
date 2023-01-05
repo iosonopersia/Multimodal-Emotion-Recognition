@@ -1,1 +1,1 @@
-python src/utils/mp4towav.py
+python scripts/mp4towav.py

@@ -1,6 +1,5 @@
 import torch
-from utils import apply_padding
-from utils.dataset_utils import get_text
+from utils import apply_padding, get_text
 import os
 import pickle
 
