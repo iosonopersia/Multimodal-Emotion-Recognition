@@ -29,12 +29,12 @@ class TextERC(torch.nn.Module):
 
     def freeze(self):
         if not self.is_frozen:
-            for param in self.wav2vec2.parameters():
+            for param in self.roberta.parameters():
                 param.requires_grad = False
             self.is_frozen = True
 
     def unfreeze(self):
         if self.is_frozen:
-            for param in self.wav2vec2.parameters():
+            for param in self.roberta.parameters():
                 param.requires_grad = True
             self.is_frozen = False
