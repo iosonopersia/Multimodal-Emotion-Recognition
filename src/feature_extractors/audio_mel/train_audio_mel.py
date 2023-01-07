@@ -11,6 +11,7 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import plotly.express as px
 import numpy as np
+import sklearn
 
 # Suppress warnings from 'transformers' package
 from transformers import logging
@@ -161,8 +162,6 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
             device)
         val_losses_values.append(loss_val)
 
-        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False)
-
         if save_checkpoint:
             os.makedirs(save_checkpoint_path.rsplit("/", 1)[0], exist_ok=True)
             torch.save({
@@ -170,6 +169,10 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             }, save_checkpoint_path)
+
+        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False)
+
+
 
         lr = optimizer.param_groups[0]['lr']
         if use_scheduler:
@@ -216,7 +219,9 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
     batch_size = data_train.config.train.data_loader.batch_size
     n_steps = len(data_train) // batch_size
+    # n_steps = 50
     for idx_batch in tqdm(range(n_steps), "Training epoch {}".format(epoch)):
+
         with torch.inference_mode():
             if epoch < 40:
                 data = data_train.get_batched_triplets(batch_size, model, mining_type="hard") #semi-hard
@@ -250,7 +255,7 @@ def validate(model, data_val, criterion, device):
     loss_eval = 0
     batch_size = data_val.config.val.data_loader.batch_size
     n_steps = len(data_val) // batch_size
-    model.eval()
+    model.train()
 
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
@@ -271,10 +276,10 @@ def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, 
     if visualization_type == "3D":
         tsne = TSNE(n_components=3)
     elif visualization_type == "2D":
-        tsne = TSNE(n_components=2)
+        tsne = TSNE(n_components=2, perplexity=100)
     else:
         raise ValueError("Visualization type not supported")
-    model.eval()
+    model.train()
     embeddings = []
     predicted_labels = []
     true_labels = []
@@ -286,10 +291,16 @@ def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, 
                 # outputs = tsne.fit_transform(outputs.cpu().detach().numpy())
                 embeddings.append(outputs[j].cpu().detach().numpy())
                 true_labels.append(labels[j].item())
+
+    #silhouette score
+    silhouette_score = sklearn.metrics.silhouette_score(embeddings, true_labels)
+    print(f"Silhouette score: {silhouette_score}")
+
+
     # visualize embeddings
     embeddings = PCA(random_state=0).fit_transform(np.array(embeddings))[:,:50]
     embeddings = tsne.fit_transform(np.array(embeddings))
-
+    # embeddings = np.array(embeddings)
     true_labels = np.array(true_labels)
     x = embeddings[:, 0]
     y = embeddings[:, 1]
