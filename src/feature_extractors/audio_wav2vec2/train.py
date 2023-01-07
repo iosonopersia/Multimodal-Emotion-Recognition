@@ -222,7 +222,7 @@ def train(model, dl_train, criterion, optimizer, lr_scheduler, is_frozen_epoch, 
     loss_train = 0
 
     model.train()
-    for idx_batch, batch in tqdm(enumerate(dl_train), total=len(dl_train)):
+    for idx_batch, batch in tqdm(enumerate(dl_train), total=len(dl_train), desc=f"Epoch {epoch}"):
         audio = batch["audio"].to(device)
         lengths = batch["lengths"].to(device)
         emotion = batch["emotion"].to(device)
@@ -256,7 +256,7 @@ def validate(model, dl_val, criterion, device):
 
     model.eval()
     with torch.inference_mode():
-        for batch in tqdm(dl_val, total=len(dl_val)):
+        for batch in tqdm(dl_val, total=len(dl_val), desc="Validation"):
             audio = batch["audio"].to(device)
             lengths = batch["lengths"].to(device)
             emotion = batch["emotion"].to(device)
