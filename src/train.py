@@ -242,6 +242,7 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
         outputs = model(text, audio, padding_mask)
         loss = criterion(outputs.permute(0, 2, 1), emotion)
         loss.backward()
+        # TODO: try removing gradient clipping and see how does it affect performance
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 

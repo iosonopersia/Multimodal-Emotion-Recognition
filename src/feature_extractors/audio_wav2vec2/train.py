@@ -231,7 +231,6 @@ def train(model, dl_train, criterion, optimizer, lr_scheduler, is_frozen_epoch, 
         outputs = model(audio, lengths)
         loss = criterion(outputs, emotion)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         if not is_frozen_epoch:
