@@ -18,23 +18,20 @@ class DatasetMelAudio(torch.utils.data.Dataset):
     def __init__(self, mode="train", config=None, compute_statistics=False):
         super().__init__()
 
-        self.MAX_AUDIO_LENGTH = 40000 #42000 # 42000 ms = 42 seconds
+        self.MAX_AUDIO_LENGTH = 10 #seconds
         self.config = config
-
+        self.len_triplet_picking = 100
         self.mode = mode
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
             self.mel_spectogram_cache = "data/MELD.Raw/train_splits/mel_spectograms"
-            self.len_triplet_picking = config.train.data_loader.batch_size
 
         if self.mode == "val":
             self.audio_path = "data/MELD.Raw/dev_splits_complete/wav"
             self.mel_spectogram_cache = "data/MELD.Raw/dev_splits_complete/mel_spectograms"
-            self.len_triplet_picking = config.val.data_loader.batch_size
         if self.mode == "test":
             self.audio_path = "data/MELD.Raw/output_repeated_splits_test/wav"
             self.mel_spectogram_cache = "data/MELD.Raw/output_repeated_splits_test/mel_spectograms"
-            self.len_triplet_picking = config.test.data_loader.batch_size
 
 
         os.makedirs(self.mel_spectogram_cache, exist_ok=True)
@@ -133,36 +130,41 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
         '''
         input_debug = False
-        save_to_cache = False
+        save_to_cache = True
         augmentation = False
 
         if input_debug:
-            chunk_to_zero = self.MAX_AUDIO_LENGTH // 7
+            MAX_AUDIO_LENGTH = 2 * 16000
+            chunk_to_zero = (MAX_AUDIO_LENGTH )// 7
             if emotion == 0:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, 0:chunk_to_zero] = 0
             if emotion == 1:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, chunk_to_zero:chunk_to_zero * 2] = 0
             if emotion == 2:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, chunk_to_zero * 2:chunk_to_zero * 3] = 0
             if emotion == 3:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, chunk_to_zero * 3:chunk_to_zero * 4] = 0
             if emotion == 4:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, chunk_to_zero * 4:chunk_to_zero * 5] = 0
             if emotion == 5:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, chunk_to_zero * 5:chunk_to_zero * 6] = 0
             if emotion == 6:
-                audio = torch.rand(1, self.MAX_AUDIO_LENGTH)
+                audio = torch.rand(1, MAX_AUDIO_LENGTH)
                 audio[:, chunk_to_zero * 6:chunk_to_zero * 7] = 0
 
-            audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = 16000, n_fft=400, hop_length=160, n_mels=128)(audio)
-            audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
-            audio_mel_spectogram = (audio_mel_spectogram - self.min) / (self.max - self.min)
+            # audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = 16000, n_fft=400, hop_length=160, n_mels=128)(audio)
+            # audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                audio_mel_spectogram = self.feature_extraction(audio.numpy(), sr=16000, nb_fft=400, hop_size=160, nb_mels=128, f_min=0.0, f_max=None, htk=True, power=1.0, norm=1, window_function='hann', center=True)
+            audio_mel_spectogram = torch.tensor(audio_mel_spectogram).permute(2,0,1)
+            audio_mel_spectogram = (audio_mel_spectogram - audio_mel_spectogram.min()) / (audio_mel_spectogram.max() - audio_mel_spectogram.min())
             audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
 
             return audio_mel_spectogram
@@ -190,7 +192,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         if augmentation and self.mode=="train":
             noise = torch.randn(size=(audio.shape[0], audio.shape[1])) / 300
             audio = audio + noise
-        audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH - audio.shape[1]), mode='constant', value=0)
+        audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH * sr - audio.shape[1]), mode='constant', value=0)
         # with warnings.catch_warnings():
         #     warnings.simplefilter("ignore")
         #     audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = sr, n_fft=400, hop_length=160, n_mels=128)(audio)
@@ -233,7 +235,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             raise ValueError("mining_type must be 'hard', 'semi-hard' or 'random'")
 
         device = next(model.parameters()).device
-        model.eval()
+        model.train()
 
         if mining_type == "random":
             anchors = []
@@ -348,6 +350,8 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         while i < self.len_triplet_picking:
             emotion = random.choice(list(self.emotion_labels.values()))
             random_utterance = self.text[self.text["Emotion"]==emotion].sample()
+            # random_utterance = self.text.sample()
+
             random_dialogue_id = random_utterance["Dialogue_ID"].iloc[0]
             random_utterance_id = random_utterance["Utterance_ID"].iloc[0]
             if self.check_valid(random_utterance)==False:
