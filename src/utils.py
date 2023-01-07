@@ -30,7 +30,7 @@ def apply_padding(tensors_list, padding_value=0):
 
     return torch.cat(padded_tensors, dim=0), tensors_lengths
 
-def get_text (mode="train"):
+def get_text(mode="train"):
     """Returns the transcripts for the given mode (train, val, test)."""
     assert mode in ["train", "val", "test"]
     root = os.path.join(os.path.abspath("data"), "MELD.Raw")
@@ -41,9 +41,11 @@ def get_text (mode="train"):
         data_path = os.path.join(root, "dev_sent_emo.csv")
     elif mode == 'test':
         data_path = os.path.join(root, "test_sent_emo.csv")
+    else:
+        raise ValueError(f"Invalid mode {mode}")
 
     if not os.path.exists(data_path):
-        raise ValueError("Dataset not found at {}".format(data_path))
+        raise ValueError(f"Dataset not found at {data_path}")
 
     df = pd.read_csv(data_path, usecols=['Utterance', 'Emotion', 'Dialogue_ID', 'Utterance_ID'])
 

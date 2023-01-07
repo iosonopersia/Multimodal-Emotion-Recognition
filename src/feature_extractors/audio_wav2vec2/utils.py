@@ -24,9 +24,11 @@ def get_text(mode="train"):
         data_path = os.path.join(root, "dev_sent_emo.csv")
     elif mode == 'test':
         data_path = os.path.join(root, "test_sent_emo.csv")
+    else:
+        raise ValueError(f"Invalid mode {mode}")
 
     if not os.path.exists(data_path):
-        raise ValueError("Dataset not found at {}".format(data_path))
+        raise ValueError(f"Dataset not found at {data_path}")
 
     df = pd.read_csv(data_path, usecols=['Utterance', 'Emotion', 'Dialogue_ID', 'Utterance_ID'])
 
