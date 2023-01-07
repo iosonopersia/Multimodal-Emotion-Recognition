@@ -15,19 +15,20 @@ class AudioMelFeatureExtractor(nn.Module):
     def __init__(self):
         super(AudioMelFeatureExtractor, self).__init__()
         self.resnet18 = resnet18(weights=None)
-        self.resnet18.fc = nn.Identity()
+        checkpoint = torch.load("checkpoints/EmoResnet.pth")
+        self.resnet18.load_state_dict(checkpoint['model_state_dict'])
+        # self.resnet18.fc = nn.Identity()
         self.projector = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.Dropout(0.5),
-            nn.ReLU(),
-            nn.Linear(256, 300)
+            nn.Linear(1000, 300),
+            # nn.Dropout(0.4),
+            # nn.ReLU(),
+            # nn.Linear(512, 300)
         )
     def forward(self, x):
         x = self.resnet18(x)
         x = self.projector(x)
         x = normalize(x, p=2, dim=1)
-
         return x
 
 # add to AudioMelFeatureExtractor class a classification head for emotion (output 7 classes)
@@ -35,7 +36,7 @@ class TestAudioExtractor(nn.Module):
     def __init__(self, load_checkpoint=True):
         super(TestAudioExtractor, self).__init__()
         self.audio_extractor = AudioMelFeatureExtractor()
-        self.audio_extractor.eval()
+        # self.audio_extractor.eval()
         if load_checkpoint:
             checkpoint = torch.load("checkpoints/audio_feature_extractor.pth")
             self.audio_extractor.load_state_dict(checkpoint['model_state_dict'])
@@ -45,12 +46,6 @@ class TestAudioExtractor(nn.Module):
         self.classifier = nn.Sequential(
             nn.ReLU(),
             nn.Linear(300, 128),
-            # nn.ReLU(),
-            # nn.Linear(1024, 512),
-            # nn.ReLU(),
-            # nn.Linear(512, 256),
-            # nn.ReLU(),
-            # nn.Linear(256, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -59,6 +54,26 @@ class TestAudioExtractor(nn.Module):
 
     def forward(self, x):
         x = self.audio_extractor(x)
+        x = self.classifier(x)
+        return x
+
+
+class EmoResnet (nn.Module):
+    def __init__(self):
+        super(EmoResnet, self).__init__()
+        self.resnet18 = resnet18(weights="DEFAULT")
+        self.classifier = nn.Sequential(
+            nn.ReLU(),
+            nn.Dropout(0.4),
+            nn.Linear(1000, 512),
+            nn.ReLU(),
+            nn.Linear(512, 7)
+            # nn.ReLU(),
+            # nn.Linear(128, 7)
+        )
+
+    def forward(self, x):
+        x = self.resnet18(x)
         x = self.classifier(x)
         return x
 
@@ -72,7 +87,7 @@ class M2FnetLossAudioMEL(nn.Module):
         if self.adaptive:
             self.triplet_loss = AdaptiveTripletMarginLoss()
         else:
-            self.triplet_loss = torch.nn.TripletMarginLoss(margin=1.0, p=2)
+            self.triplet_loss = torch.nn.TripletMarginLoss(margin=0.2, p=2)
 
         self.covariance_loss = CovarianceLoss()
         self.variance_loss = VarianceLoss()
