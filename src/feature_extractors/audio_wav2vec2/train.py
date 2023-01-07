@@ -62,11 +62,11 @@ def main(config=None):
 
     #============OPTIMIZER===============
     #------------------------------------
-    finetuning_lr = config.solver.finetuning_lr
-    frozen_lr = config.solver.frozen_lr
-    weight_decay = config.solver.weight_decay
-    frozen_epochs_optimizer = torch.optim.AdamW(model.classifier_head.parameters(), lr=frozen_lr, weight_decay=weight_decay)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=finetuning_lr, weight_decay=weight_decay)
+    finetuning_cfg = config.solver.finetuning
+    frozen_cfg = config.solver.frozen
+
+    frozen_epochs_optimizer = torch.optim.AdamW(model.classifier_head.parameters(), lr=frozen_cfg.lr, weight_decay=frozen_cfg.weight_decay)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=finetuning_cfg.lr, weight_decay=finetuning_cfg.weight_decay)
 
     #============WANDB==============
     if config.wandb.enabled:
@@ -80,7 +80,7 @@ def main(config=None):
 
     #============SCHEDULER===============
     #------------------------------------
-    warmup_epochs = config.solver.warmup_epochs
+    warmup_epochs = finetuning_cfg.warmup_epochs
     lr_scheduler = get_constant_schedule_with_warmup(optimizer=optimizer, num_warmup_steps=warmup_epochs*len(dl_train))
 
     #============TRAIN===============
@@ -105,16 +105,17 @@ def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen
     losses_values = []
     val_losses_values = []
 
+    #============SOLVER===============
     solver_cfg = config.solver
     epochs = solver_cfg.epochs
     num_frozen_epochs = solver_cfg.num_frozen_epochs
-
-    wandb_cfg = config.wandb
-    wandb_log = wandb_cfg.enabled
-
     early_stopping = solver_cfg.early_stopping.enabled
     restore_best_weights = solver_cfg.early_stopping.restore_best_weights
     patience = solver_cfg.early_stopping.patience
+
+    #============WANDB===============
+    wandb_cfg = config.wandb
+    wandb_log = wandb_cfg.enabled
 
     #============CHECKPOINT===============
     checkpoint_cfg = config.checkpoint

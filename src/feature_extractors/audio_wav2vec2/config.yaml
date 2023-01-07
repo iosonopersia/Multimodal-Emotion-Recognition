@@ -7,10 +7,13 @@ solver:
     loss_fn: CE
     balance_classes: False
     num_frozen_epochs: 2
-    frozen_lr: 1.0e-4
-    warmup_epochs: 2
-    finetuning_lr: 2.0e-6
-    weight_decay: 0.01
+    finetuning:
+        warmup_epochs: 2
+        lr: 2.0e-6
+        weight_decay: 5.0e-5
+    frozen:
+        lr: 1.0e-4
+        weight_decay: 0.01
     epochs: 100
     early_stopping:
         enabled: True

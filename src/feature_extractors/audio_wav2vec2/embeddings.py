@@ -81,10 +81,11 @@ def save_embeddings(dataloader, model, device, path, mode):
             hidden_states = out[0] # (batch_size, seq_len, 768)
             lengths = out[1] # (batch_size,)
 
-            # Mean pooling over non-padded elements:
-            for i, length in enumerate(lengths):
-                hidden_states[i, length:, :] = 0
-            embeddings = torch.sum(hidden_states, dim=1) / lengths.unsqueeze(dim=1).type(torch.float32)
+            # # Mean pooling over non-padded elements:
+            # embeddings = torch.stack([torch.mean(hidden_states[i, :length, :], dim=0) for i, length in enumerate(lengths)], dim=0)
+
+            # Pooling over the first element only:
+            embeddings = hidden_states[:, 0, :]
 
             embeddings_tensor[idx] = embeddings.cpu()
 
