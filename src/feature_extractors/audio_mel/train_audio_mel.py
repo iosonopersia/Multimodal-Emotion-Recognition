@@ -170,7 +170,7 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
             'optimizer_state_dict': optimizer.state_dict(),
             }, save_checkpoint_path)
 
-        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False)
+        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False, wandb_log=wandb_log)
 
 
 
@@ -224,7 +224,7 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
 
         with torch.inference_mode():
             if epoch < 40:
-                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard") #semi-hard
+                data = data_train.get_batched_triplets(batch_size, model, mining_type="semi-hard") #semi-hard
             else:
                 data = data_train.get_batched_triplets(batch_size, model, mining_type="hard")
 
@@ -239,7 +239,6 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
         loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
 
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         loss_train += loss.item()
@@ -272,7 +271,7 @@ def validate(model, data_val, criterion, device):
 
     return loss_eval / n_steps
 
-def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, save=True, visualize=False):
+def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, save=True, visualize=False, wandb_log=False):
     if visualization_type == "3D":
         tsne = TSNE(n_components=3)
     elif visualization_type == "2D":
@@ -325,6 +324,12 @@ def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, 
     if save:
         fig.write_html(os.path.join(save_dir_html, f"visualization_{epoch}.html"))
         fig.write_image(os.path.join(save_dir_png, f"visualization_{epoch}.png"))
+        if wandb_log:
+            #png
+            wandb.log({"Visualization_png": [wandb.Image(os.path.join(save_dir_png, f"visualization_{epoch}.png"))]})
+            #html
+            wandb.log({"Visualization_html": [wandb.Html(os.path.join(save_dir_html, f"visualization_{epoch}.html"))]})
+
     if visualize:
         fig.show()
 
