@@ -171,7 +171,7 @@ def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen
 
         if save_checkpoint:
             torch.save({
-                'epoch': epoch + 1,
+                'epoch': epoch,
                 'model_state_dict': model.state_dict(),
             }, save_checkpoint_path)
 
@@ -206,7 +206,7 @@ def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen
                     if restore_best_weights:
                         best_model = torch.load(best_weights_save_path)
                         torch.save({
-                            'epoch': best_model['epoch'] + 1,
+                            'epoch': best_model['epoch'],
                             'model_state_dict': best_model['model_state_dict'],
                         }, save_checkpoint_path)
                         os.remove(best_weights_save_path)
