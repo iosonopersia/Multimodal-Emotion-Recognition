@@ -13,7 +13,7 @@ def get_config():
     return config
 
 
-def get_text (mode="train"):
+def get_text(mode="train"):
     """Returns the transcripts for the given mode (train, val, test)."""
     assert mode in ["train", "val", "test"]
     root = os.path.join(os.path.abspath("data"), "MELD.Raw")
@@ -30,6 +30,17 @@ def get_text (mode="train"):
 
     df = pd.read_csv(data_path, usecols=['Utterance', 'Emotion', 'Dialogue_ID', 'Utterance_ID'])
 
+    # Remove corrupted multimedia files
+    if mode == "train":
+        df = df[(df["Dialogue_ID"] != 125) | (df["Utterance_ID"] != 3)]
+    elif mode == "val":
+        df = df[(df["Dialogue_ID"] != 110) | (df["Utterance_ID"] != 7)]
+    elif mode == "test":
+        df = df[(df["Dialogue_ID"] != 38) | (df["Utterance_ID"] != 4)]
+        df = df[(df["Dialogue_ID"] != 220) | (df["Utterance_ID"] != 0)]
+    df = df.reset_index(drop=True)
+
+    # Convert encoding from cp1252 to utf-8
     cp1252_to_utf8 = {
         "\x85": "…", # \x85 \u2026 HORIZONTAL ELLIPSIS
         "\x91": "‘", # \x91 \u2018 LEFT SINGLE QUOTATION MARK
