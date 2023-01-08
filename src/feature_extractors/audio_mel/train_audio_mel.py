@@ -90,7 +90,7 @@ def main(config=None):
     if (load_checkpoint):
         if os.path.exists(load_checkpoint_path):
             checkpoint = torch.load(load_checkpoint_path)
-            start_epoch = checkpoint['epoch']
+            start_epoch = checkpoint['epoch'] + 1 # start from the next epoch
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         else:
@@ -169,7 +169,7 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
         if save_checkpoint:
             os.makedirs(save_checkpoint_path.rsplit("/", 1)[0], exist_ok=True)
             torch.save({
-            'epoch': epoch+1,
+            'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             }, save_checkpoint_path)
@@ -207,7 +207,7 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
                     if restore_best_weights:
                         best_model = torch.load(save_checkpoint_path.rsplit("/", 1)[0]+"/best_weights.pth")
                         torch.save({
-                            'epoch': best_model["epoch"]+1,
+                            'epoch': best_model["epoch"],
                             'model_state_dict': best_model["model_state_dict"],
                             'optimizer_state_dict': best_model["optimizer_state_dict"],
                             }, save_checkpoint_path)
