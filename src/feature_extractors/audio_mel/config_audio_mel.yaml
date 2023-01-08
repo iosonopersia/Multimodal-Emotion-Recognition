@@ -1,3 +1,5 @@
+---
+
 DEBUG:
   enabled: False
   num_samples: 32
@@ -10,15 +12,15 @@ AUDIO:
     wav2vec_sr: 16000
 
 checkpoint:
-    save_path: checkpoints/audio_feature_extractor.pth
-    load_path: checkpoints/audio_feature_extractor.pth
+    save_path: checkpoints/audio_mel/checkpoint.pth
+    load_path: checkpoints/audio_mel/checkpoint.pth
     save_checkpoint: True
     load_checkpoint: False
 
 solver:
     adaptive_triplet_margin_loss: False
-    covariance_loss: False
-    variance_loss: False
+    covariance_loss: True
+    variance_loss: True
     lr: 1.0e-5
     weight_decay: 1.0e-6
     epochs: 50
@@ -31,34 +33,32 @@ solver:
         patience: 10
         restore_best_weights: True
 
-model:
-
 train:
     data_loader:
         shuffle: True
         batch_size: 32
-        num_workers: 3
+        num_workers: 2
         pin_memory: True
-    max_value: 32.4030  # db scale:32.4030 | normal scale:1738.9810
-    min_value: -100
+    # max_value: 32.4030  # db scale:32.4030 | normal scale:1738.9810
+    # min_value: -100
 
 val:
     data_loader:
         shuffle: False
         batch_size: 32
-        num_workers: 3
+        num_workers: 2
         pin_memory: True
 
 test:
     data_loader:
         shuffle: False
         batch_size: 32
-        num_workers: 3
+        num_workers: 2
         pin_memory: True
 
 wandb:
     enabled: False
-    watch_model: True
+    watch_model: False
     project_name: audio-mel-embeddings
 
 ...
