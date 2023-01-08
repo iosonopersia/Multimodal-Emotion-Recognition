@@ -235,7 +235,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             raise ValueError("mining_type must be 'hard', 'semi-hard' or 'random'")
 
         device = next(model.parameters()).device
-        model.train()
+        model.eval()
 
         if mining_type == "random":
             anchors = []
@@ -271,6 +271,14 @@ class DatasetMelAudio(torch.utils.data.Dataset):
                 negative_utterance_id = negative_utterance["Utterance_ID"].iloc[0]
                 negative = self.get_mel_spectogram(os.path.join(os.path.abspath(self.audio_path), f"dia{negative_dialogue_id}_utt{negative_utterance_id}.wav"),  negative_utterance["Emotion"].iloc[0])
                 negatives.append(negative)
+
+                # write to file
+                # anchor_emotion = anchor_utterance["Emotion"].iloc[0]
+                # p_emotion = positive_utterance["Emotion"].iloc[0]
+                # n_emotion = negative_utterance["Emotion"].iloc[0]
+                # file = open("src/feature_extractors/audio_mel/triplet_random.csv", "a")
+                # file.write(f"{anchor_dialogue_id}_{anchor_utterance_id}, {anchor_emotion},{positive_dialogue_id}_{positive_utterance_id}, {p_emotion},{negative_dialogue_id}_{negative_utterance_id}, {n_emotion}\n")
+                # file.close()
             anchors = torch.stack(anchors)
             positives = torch.stack(positives)
             negatives = torch.stack(negatives)
@@ -339,41 +347,38 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             return {"anchor": anchors, "positive": positives, "negative": negatives}
 
 
-        i = 0
         embeddings = []
         utterances = []
         anchor = []
         positive = []
         negative = []
-        random_audio_mel_spectograms = []
-        self.len_triplet_picking = (self.len_triplet_picking // batch_size) * batch_size
-        while i < self.len_triplet_picking:
-            emotion = random.choice(list(self.emotion_labels.values()))
-            random_utterance = self.text[self.text["Emotion"]==emotion].sample()
-            # random_utterance = self.text.sample()
+        len_triplet_picking = (self.len_triplet_picking // batch_size)
+        for i in range(len_triplet_picking):
+            random_audio_mel_spectograms = []
+            for j in range(batch_size):
+                emotion = random.choice(list(self.emotion_labels.values()))
+                random_utterance = self.text[self.text["Emotion"]==emotion].sample()
+                # random_utterance = self.text.sample()
 
-            random_dialogue_id = random_utterance["Dialogue_ID"].iloc[0]
-            random_utterance_id = random_utterance["Utterance_ID"].iloc[0]
-            if self.check_valid(random_utterance)==False:
-                continue
-            i+=1
-            utterances.append(random_utterance)
+                random_dialogue_id = random_utterance["Dialogue_ID"].iloc[0]
+                random_utterance_id = random_utterance["Utterance_ID"].iloc[0]
+                # if self.check_valid(random_utterance)==False:
+                #     continue
+                # i+=1
+                utterances.append(random_utterance)
 
-            # Load the audio
-            random_wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{random_dialogue_id}_utt{random_utterance_id}.wav")
+                # Load the audio
+                random_wav_path = os.path.join(os.path.abspath(self.audio_path), f"dia{random_dialogue_id}_utt{random_utterance_id}.wav")
 
-            # Get mel spectogram
-            random_audio_mel_spectogram = self.get_mel_spectogram(random_wav_path, random_utterance["Emotion"].iloc[0])
+                # Get mel spectogram
+                random_audio_mel_spectogram = self.get_mel_spectogram(random_wav_path, random_utterance["Emotion"].iloc[0])
 
-            random_audio_mel_spectograms.append(random_audio_mel_spectogram)
+                random_audio_mel_spectograms.append(random_audio_mel_spectogram)
 
-            # Compute the embedding
-            if i % batch_size == 0 and i != 0:
-                random_audio_mel_spectograms = torch.stack(random_audio_mel_spectograms).to(device)
-                random_embeddings = model(random_audio_mel_spectograms).detach().cpu()
-                for random_embedding in random_embeddings:
-                    embeddings.append(random_embedding)
-                random_audio_mel_spectograms = []
+                # Compute the embedding
+            random_audio_mel_spectograms = torch.stack(random_audio_mel_spectograms).to(device)
+            random_embeddings = model(random_audio_mel_spectograms).detach().cpu()
+            embeddings.extend(random_embeddings)
 
         # compute the distance matrix
         embeddings = torch.stack(embeddings).squeeze()
@@ -401,9 +406,10 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
         # BATCH
         losses = torch.tensor( [distance_matrix[index,p] - distance_matrix[index, n] for index,(p,n) in enumerate(zip(positive_index, negative_index))])
+        # put to 0 the value if [distance_matrix[index,p] - distance_matrix[index, n] is negative
 
         # take the batch_size biggest losses
-        losses, indices = torch.topk(losses, batch_size)
+        _, indices = torch.topk(losses, batch_size) #TODO do not sort
 
         # get the corresponding utterances of index, p, and n
         index = [utterances[i] for i in indices]
@@ -429,6 +435,22 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             p_audio_mel_spectogram = self.get_mel_spectogram(p_wav_path, p_utterance["Emotion"].iloc[0])
             n_audio_mel_spectogram = self.get_mel_spectogram(n_wav_path, n_utterance["Emotion"].iloc[0])
 
+            # open a file
+            # index_emotion = index_utterance["Emotion"].iloc[0]
+            # p_emotion = p_utterance["Emotion"].iloc[0]
+            # n_emotion = n_utterance["Emotion"].iloc[0]
+
+            #embedding anchor
+            # embedding_anchor = model (index_audio_mel_spectogram.unsqueeze(0).to(device)).detach().cpu()
+            # embedding_positive = model (p_audio_mel_spectogram.unsqueeze(0).to(device)).detach().cpu()
+            # embedding_negative = model (n_audio_mel_spectogram.unsqueeze(0).to(device)).detach().cpu()
+
+            # distance_anchor_positive = self.compute_distance(embedding_anchor, embedding_positive)
+            # distance_anchor_negative = self.compute_distance(embedding_anchor, embedding_negative)
+
+            # file = open("src/feature_extractors/audio_mel/triplet_hard.csv", "a")
+            # file.write(f"{index_dialogue_id}_{index_utterance_id}, {index_emotion},{p_dialogue_id}_{p_utterance_id}, {p_emotion},{n_dialogue_id}_{n_utterance_id}, {n_emotion}, {distance_anchor_positive},{distance_anchor_negative}\n")
+            # file.close()
             anchor.append(index_audio_mel_spectogram)
             positive.append(p_audio_mel_spectogram)
             negative.append(n_audio_mel_spectogram)
@@ -441,11 +463,11 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
 
     def compute_positive_mask (self, utterances):
-
+        # TODO optimize this
         positive_mask = torch.ones((len(utterances), len(utterances)))
 
         for i, utterance in enumerate(utterances):
-            positive_mask[i, i] = 0
+            positive_mask[i, i] = 0 # TODO delete this line
             for j, other_utterance in enumerate(utterances):
                 # if i and j have the same emotion label the put the value to 0 in the mask
                 if utterance["Emotion"].iloc[0] != other_utterance["Emotion"].iloc[0]:
@@ -454,6 +476,7 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         return positive_mask
 
     def compute_negative_mask (self, utterances):
+        # TODO optimize this
         inf = torch.tensor(float("inf"))
         negative_mask = torch.zeros((len(utterances), len(utterances)))
 

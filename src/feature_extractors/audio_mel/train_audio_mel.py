@@ -219,16 +219,17 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
     batch_size = data_train.config.train.data_loader.batch_size
     n_steps = len(data_train) // batch_size
-    # n_steps = 50
+    # n_steps = 300
+    model.eval()
     for idx_batch in tqdm(range(n_steps), "Training epoch {}".format(epoch)):
 
         with torch.inference_mode():
-            if epoch < 40:
+            if epoch < 15:
                 data = data_train.get_batched_triplets(batch_size, model, mining_type="semi-hard") #semi-hard
             else:
                 data = data_train.get_batched_triplets(batch_size, model, mining_type="hard")
 
-        model.train()
+        # model.train()
         anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
 
         # Feature extractor
@@ -254,8 +255,8 @@ def validate(model, data_val, criterion, device):
     loss_eval = 0
     batch_size = data_val.config.val.data_loader.batch_size
     n_steps = len(data_val) // batch_size
-    model.train()
-
+    # model.train()
+    model.eval()
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
             data = data_val.get_batched_triplets(batch_size, model)
@@ -278,7 +279,7 @@ def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, 
         tsne = TSNE(n_components=2, perplexity=100)
     else:
         raise ValueError("Visualization type not supported")
-    model.train()
+    model.eval()
     embeddings = []
     predicted_labels = []
     true_labels = []
