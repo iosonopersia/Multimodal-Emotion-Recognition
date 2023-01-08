@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 from torchvision.models import resnet18
-
-from losses.M2FNetAudioEmbeddingLoss import M2FNetAudioEmbeddingLoss
 from torch.nn.functional import normalize
 
 '''here we use ResNet18 as the backbone of the encoder network while the projector con-
