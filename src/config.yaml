@@ -16,7 +16,7 @@ checkpoint:
 solver:
     loss_fn: CE
     balance_classes: False
-    lr: 1.0e-4
+    lr: 5.0e-5
     weight_decay: 0.01
     epochs: 100
     scheduler:
@@ -24,8 +24,8 @@ solver:
         scheduler_fn: ExponentialLR
         gamma: 0.98
     early_stopping:
-        enabled: False
-        patience: 5
+        enabled: True
+        patience: 3
         restore_best_weights: True
 
 model:
