@@ -10,7 +10,7 @@ class VarianceLoss(torch.nn.Module):
         var_loss = 0
         for z in [za, zp, zn]:
             var_loss += self.Lvar(z)
-        return var_loss
+        return max(0,var_loss)
 
     def Lvar(self, z):
 

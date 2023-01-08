@@ -9,7 +9,7 @@ class CovarianceLoss(torch.nn.Module):
         cov_loss = 0
         for z in [za, zp, zn]:
             cov_loss += self.Lcov(z)
-        return cov_loss
+        return max(0,cov_loss)
 
     def Lcov(self, z):
         cov_z = torch.cov(z.T)
