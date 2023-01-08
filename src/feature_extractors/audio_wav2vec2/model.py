@@ -25,11 +25,8 @@ class AudioERC(torch.nn.Module):
         hidden_states = out[0] # (batch_size, seq_len, hidden_size)
         lengths = out[1] # (batch_size,)
 
-        # # Mean pooling over non-padded elements:
-        # out = torch.cat([torch.mean(hidden_states[[i], :length, :], dim=1) for i, length in enumerate(lengths)], dim=0)
-
-        # Pooling over the first element only:
-        out = hidden_states[:, 0, :]
+        # Mean pooling over non-padded elements:
+        out = torch.cat([torch.mean(hidden_states[[i], :length, :], dim=1) for i, length in enumerate(lengths)], dim=0)
 
         out = self.classifier_head(out)
         return out
