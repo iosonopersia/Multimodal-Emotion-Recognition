@@ -361,15 +361,17 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
     @torch.no_grad()
     def compute_positive_mask (self, utterances):
-        # TODO optimize this
-        positive_mask = torch.ones((len(utterances), len(utterances)))
+        n_utterances = len(utterances)
+        positive_mask = torch.ones((n_utterances, n_utterances), dtype=torch.float32)
+        positive_mask.diagonal()[:] = 0.0
 
-        for i, utterance in enumerate(utterances):
-            positive_mask[i, i] = 0 # TODO delete this line
-            for j, other_utterance in enumerate(utterances):
-                # if i and j have the same emotion label the put the value to 0 in the mask
-                if utterance["Emotion"].iloc[0] != other_utterance["Emotion"].iloc[0]:
-                    positive_mask[i, j] = 0
+        for i in range(n_utterances):
+            i_emotion = utterances[i]["Emotion"].iloc[0]
+            for j in range(i+1, n_utterances):
+                j_emotion = utterances[j]["Emotion"].iloc[0]
+                if i_emotion != j_emotion:
+                    positive_mask[i, j] = 0.0
+                    positive_mask[j, i] = 0.0
 
         return positive_mask
 
