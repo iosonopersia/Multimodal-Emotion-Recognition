@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 from torchvision.models import resnet18
 
-from losses.AdaptiveTripletMarginLoss import AdaptiveTripletMarginLoss
-from losses.CovarianceLoss import CovarianceLoss
-from losses.VarianceLoss import VarianceLoss
+from losses.M2FNetAudioEmbeddingLoss import M2FNetAudioEmbeddingLoss
 from torch.nn.functional import normalize
 
 '''here we use ResNet18 as the backbone of the encoder network while the projector con-
@@ -76,29 +74,3 @@ class EmoResnet (nn.Module):
         x = self.resnet18(x)
         x = self.classifier(x)
         return x
-
-class M2FnetLossAudioMEL(nn.Module):
-    def __init__(self, adaptive=True, covariance=True, variance=True):
-        super(M2FnetLossAudioMEL, self).__init__()
-        self.adaptive = adaptive
-        self.covariance = covariance
-        self.variance = variance
-
-        if self.adaptive:
-            self.triplet_loss = AdaptiveTripletMarginLoss()
-        else:
-            self.triplet_loss = torch.nn.TripletMarginLoss(margin=0.2, p=2)
-
-        self.covariance_loss = CovarianceLoss()
-        self.variance_loss = VarianceLoss()
-
-
-    def forward(self, anchor, positive, negative):
-        loss =  20 * self.triplet_loss(anchor, positive, negative)
-        if self.covariance:
-            loss += 5 * self.covariance_loss(anchor, positive, negative)
-        if self.variance:
-            loss += 1 * self.variance_loss(anchor, positive, negative)
-        return loss
-
-

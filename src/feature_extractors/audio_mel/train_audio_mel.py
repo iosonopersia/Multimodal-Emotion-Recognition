@@ -2,7 +2,8 @@ import os
 import torch
 import wandb
 from datasetAudioMel import DatasetMelAudio as Dataset
-from AudioMelFeatureExtractor import AudioMelFeatureExtractor, M2FnetLossAudioMEL
+from AudioMelFeatureExtractor import AudioMelFeatureExtractor
+from losses.M2FNetAudioEmbeddingLoss import M2FNetAudioEmbeddingLoss
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.utils import class_weight
@@ -52,7 +53,10 @@ def main(config=None):
     adaptive = config.solver.adaptive_triplet_margin_loss
     covariance = config.solver.covariance_loss
     variance = config.solver.variance_loss
-    criterion = M2FnetLossAudioMEL(adaptive=adaptive, covariance=covariance, variance=variance).to(device)
+    criterion = M2FNetAudioEmbeddingLoss(
+        adaptive=adaptive,
+        covariance_enabled=covariance,
+        variance_enabled=variance).to(device)
 
     #============OPTIMIZER===============
     #------------------------------------
