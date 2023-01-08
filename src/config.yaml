@@ -4,7 +4,7 @@ AUDIO:
     wav2vec_sr: 16000
 
 embeddings:
-    text: embeddings/text_large
+    text: embeddings/text_base
     audio: embeddings/audio_wav2vec2
 
 checkpoint:
@@ -29,25 +29,29 @@ solver:
         restore_best_weights: True
 
 model:
-    DROPOUT: 0.4
+    dropout: 0.4
     AUDIO:
-        EMBEDDING_SIZE: 768
-        N_HEAD: 8
-        N_LAYERS: 6
-        N_ENCODERS: 1
+        enabled: True
+        embedding_size: 768
+        n_head: 8
+        n_transformers: 1
+        n_encoder_layers: 6
+
     TEXT:
-        EMBEDDING_SIZE: 1024
-        N_HEAD: 8
-        N_LAYERS: 6
-        N_ENCODERS: 1
+        enabled: True
+        embedding_size: 768
+        n_head: 8
+        n_transformers: 1
+        n_encoder_layers: 6
     FAM:
-        EMBEDDING_SIZE: 768
-        N_HEAD: 8
-        N_LAYERS: 5
+        enabled: True
+        embedding_size: 768
+        n_head: 8
+        n_layers: 5
     CLASSIFIER:
-        N_LAYERS: 2
-        HIDDEN_SIZE: 128
-    OUTPUT_SIZE: 7
+        hidden_size: 768
+        output_size: 7
+        n_layers: 2
 
 train:
     data_loader:
@@ -71,7 +75,7 @@ test:
         pin_memory: True
 
 wandb:
-    enabled: True
+    enabled: False
     watch_model: False
     project_name: multimodal-emotion-recognition
 
