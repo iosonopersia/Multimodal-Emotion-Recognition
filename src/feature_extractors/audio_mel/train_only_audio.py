@@ -172,16 +172,6 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, s
             wandb.log({'Learning_Rate': lr, 'Train': loss_train, 'Validation': loss_val, 'Epoch': epoch, 'accuracy': accuracy, 'weighted_f1': weighted_f1})
 
 
-        # Hyperparameter search
-        # if hyperparameter_search:
-        #     with tune.checkpoint_dir(epoch):
-        #         path = save_checkpoint_path
-        #         os.makedirs(path, exist_ok=True)
-        #         path += os.sep + "checkpoint.pth"
-        #         torch.save((model.state_dict(), optimizer.state_dict()), path)
-
-        #     tune.report(loss=orig_mre_loss)
-
     if wandb_log:
         wandb.finish()
 
@@ -190,7 +180,7 @@ def training_loop(model, dl_train, dl_val, criterion, optimizer, lr_scheduler, s
 def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0
 
-    model.train()
+    model.eval()
     for idx_batch, data in tqdm(enumerate(dl_train), total=len(dl_train)):
         audio, emotion = data["audio_mel_spectogram"].to(device), data["emotion"].to(device)
 
@@ -201,7 +191,6 @@ def train(model, dl_train, criterion, optimizer, epoch, wandb_log, device):
         outputs = model(audio)
         loss = criterion(outputs, emotion.squeeze())
         loss.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         loss_train += loss.item()
@@ -229,9 +218,6 @@ def validate(model, dl_val, criterion, device):
 
             # Calculate metrics
             emotion_predicted = torch.argmax(outputs, dim=1)
-            # mask = (emotion != -1)
-            # emotion_predicted = emotion_predicted[mask].flatten().cpu().numpy()
-            # emotion = emotion[mask].flatten().cpu().numpy()
             accuracy += accuracy_score(emotion.squeeze().cpu().numpy(), emotion_predicted.cpu().numpy())
             weighted_f1 += f1_score(emotion.squeeze().cpu().numpy(), emotion_predicted.cpu().numpy(), average='weighted')
 
