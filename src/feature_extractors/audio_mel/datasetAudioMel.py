@@ -3,20 +3,18 @@ import torch
 from utils import get_text
 import os
 import torchaudio
-import warnings
 from PIL import Image
 import numpy as np
 import librosa
-from tqdm import tqdm
 
 
 class DatasetMelAudio(torch.utils.data.Dataset):
     def __init__(self, mode="train", config=None):
         super().__init__()
 
-        self.MAX_AUDIO_LENGTH = 5 #seconds
         self.config = config
-        self.len_triplet_picking = 100
+        self.MAX_AUDIO_LENGTH = config.AUDIO.max_duration # seconds
+        self.len_triplet_picking = config.solver.len_triplet_picking
         self.mode = mode
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
@@ -31,8 +29,8 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             raise ValueError(f"Invalid mode {mode}")
         self.audio_path = os.path.abspath(self.audio_path)
         self.mel_spectrogram_cache = os.path.abspath(self.mel_spectrogram_cache)
-
         os.makedirs(self.mel_spectrogram_cache, exist_ok=True)
+
         self.text = get_text(mode)
         if self.config.DEBUG.enabled == True:
             self.text = self.text.iloc[0:self.config.DEBUG.num_samples]
@@ -55,12 +53,11 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
         # Audio
         wav_path = os.path.join(self.audio_path, f"dia{dialogue_id}_utt{utterance_id}.wav")
+        audio_mel_spectogram = self.get_mel_spectrogram(wav_path)
 
         # Emotion
         emotion = utterance["Emotion"]
         emotion = torch.tensor([emotion])
-
-        audio_mel_spectogram = self.get_mel_spectrogram(wav_path)
 
         return {"audio_mel_spectogram": audio_mel_spectogram, "emotion": emotion}
 
@@ -151,12 +148,6 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
     @torch.no_grad()
     def get_batched_triplets(self, batch_size, model, mining_type="random", margin=1, device='cpu'):
-        '''
-        mining_type = "hard", "semi-hard", "random"
-        '''
-        if mining_type not in ["hard", "semi-hard", "random"]:
-            raise ValueError("mining_type must be 'hard', 'semi-hard' or 'random'")
-
         model.eval()
 
         if mining_type == "random":
@@ -165,6 +156,8 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             anchors, positives, negatives = self.mine_semihard_triplets(batch_size, model, device, margin)
         elif mining_type == "hard":
             anchors, positives, negatives = self.mine_hard_triplets(batch_size, model, device)
+        else:
+            raise ValueError("mining_type must be 'hard', 'semi-hard' or 'random'")
 
         return {"anchor": anchors, "positive": positives, "negative": negatives}
 
