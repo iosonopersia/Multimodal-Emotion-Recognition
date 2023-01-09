@@ -16,23 +16,25 @@ class DatasetMelAudio(torch.utils.data.Dataset):
     def __init__(self, mode="train", config=None):
         super().__init__()
 
-        self.MAX_AUDIO_LENGTH = 10 #seconds
+        self.MAX_AUDIO_LENGTH = 5 #seconds
         self.config = config
         self.len_triplet_picking = 100
         self.mode = mode
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
-            self.mel_spectogram_cache = "data/MELD.Raw/train_splits/mel_spectograms"
-
-        if self.mode == "val":
+            self.mel_spectrogram_cache = "data/MELD.Raw/train_splits/mel_spectograms"
+        elif self.mode == "val":
             self.audio_path = "data/MELD.Raw/dev_splits_complete/wav"
-            self.mel_spectogram_cache = "data/MELD.Raw/dev_splits_complete/mel_spectograms"
-        if self.mode == "test":
+            self.mel_spectrogram_cache = "data/MELD.Raw/dev_splits_complete/mel_spectograms"
+        elif self.mode == "test":
             self.audio_path = "data/MELD.Raw/output_repeated_splits_test/wav"
-            self.mel_spectogram_cache = "data/MELD.Raw/output_repeated_splits_test/mel_spectograms"
+            self.mel_spectrogram_cache = "data/MELD.Raw/output_repeated_splits_test/mel_spectograms"
+        else:
+            raise ValueError(f"Invalid mode {mode}")
+        self.mel_spectrogram_cache = os.path.abspath(self.mel_spectrogram_cache)
 
 
-        os.makedirs(self.mel_spectogram_cache, exist_ok=True)
+        os.makedirs(self.mel_spectrogram_cache, exist_ok=True)
         self.text = get_text(mode)
         if self.config.DEBUG.enabled == True:
             self.text = self.text.iloc[0:self.config.DEBUG.num_samples]
@@ -69,18 +71,28 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         return self.text["Emotion"].to_numpy()
 
     # from https://github.com/liuxubo717/cl4ac
-    def _get_mel_spectogram(self, audio_data: np.ndarray, sr: int, nb_fft: int,
-                       hop_size: int, nb_mels: int, f_min: float,
-                       f_max: float, htk: bool, power: float, norm: bool,
-                       window_function: str, center: bool) -> np.ndarray:
-
+    def _get_mel_spectrogram(self, audio_data: np.ndarray, sr: int) -> np.ndarray:
         y = audio_data/abs(audio_data).max()
         mel_bands = librosa.feature.melspectrogram(
-            y=y, sr=sr, n_fft=nb_fft, hop_length=hop_size, win_length=nb_fft,
-            window=window_function, center=center, power=power, n_mels=nb_mels,
-            fmin=f_min, fmax=f_max, htk=htk, norm=norm).T
+            y=y, sr=sr, n_fft=400, hop_length=160, win_length=400,
+            window='hann', center=True, power=1, n_mels=128,
+            fmin=0, fmax=None, htk=False, norm=1).T
 
         return np.log(mel_bands + np.finfo(float).eps)
+
+    def _add_to_cache(self, mel_spectrogram, cache_path):
+        mel_spectrogram = mel_spectrogram.permute(1, 2, 0) * 255.0
+        mel_spectrogram = mel_spectrogram.numpy().astype(np.uint8)
+
+        mel_spectrogram = Image.fromarray(mel_spectrogram.squeeze(), mode="L")
+        mel_spectrogram.save(cache_path, mode="L")
+
+    def _get_from_cache(self, cache_path):
+        mel_spectrogram = Image.open(cache_path)
+        mel_spectrogram = np.array(mel_spectrogram, dtype=np.float32)
+        mel_spectrogram = torch.from_numpy(mel_spectrogram) / 255.0
+
+        return mel_spectrogram
 
     def get_mel_spectogram(self, audio_path):
         '''
@@ -88,59 +100,49 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             the Short Time Fourier transform (STFT) is used with the frame length of 400 samples (25 ms) and hop length of
             160 samples (10ms).
             We also use 128 Mel filter banks to generate the Mel Spectrogram
-
         '''
-        save_to_cache = True
-        augmentation = False
+        # augmentation = False
+        cache_path = os.path.basename(audio_path)
+        cache_path = cache_path.split(".")[0]
+        cache_path = os.path.join(self.mel_spectrogram_cache, f"{cache_path}.png")
 
-        # take last part of the audio_path
-        audio_path_cache = os.path.split(audio_path)[-1]
-        # remove extension
-        audio_path_cache = audio_path_cache.split(".")[0]
-        audio_path_cache = os.path.join(self.mel_spectogram_cache, f"{audio_path_cache}.png")
+        if os.path.exists(cache_path):
+            # Cache hit
+            mel_spectrogram = self._get_from_cache(cache_path)
+        else:
+            # Cache miss
+            audio, sr = torchaudio.load(audio_path, format="wav", normalize=True)
 
-        if os.path.exists(audio_path_cache):
-            # load from cache
-            # Open the png image using PIL
-            audio_mel_spectogram = Image.open(audio_path_cache)
-            # Convert the PIL image to a NumPy array
-            audio_mel_spectogram = np.array(audio_mel_spectogram)
-            # Convert the NumPy array to a tensor
-            audio_mel_spectogram = torch.from_numpy(audio_mel_spectogram).to(torch.float32) / 255
-            audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
-            # plt.imshow( audio_mel_spectogram.permute(1,2,0).detach().cpu().numpy())
-            return audio_mel_spectogram
+            # Truncate waveform to max length in seconds
+            if audio.shape[0] > self.MAX_AUDIO_LENGTH * sr:
+                audio = audio[:self.MAX_AUDIO_LENGTH * sr]
 
-        audio, sr = torchaudio.load(audio_path, format="wav", normalize=True)
-        if augmentation and self.mode=="train":
-            noise = torch.randn(size=(audio.shape[0], audio.shape[1])) / 300
-            audio = audio + noise
-        audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH * sr - audio.shape[1]), mode='constant', value=0)
-        audio_mel_spectogram = self._get_mel_spectogram(audio.numpy(), sr, hop_size=160, nb_fft=400, nb_mels=128, norm=1, power=1, center=True, htk=False, f_min=0, f_max=None, window_function="hann")
-        audio_mel_spectogram = torch.tensor(audio_mel_spectogram).permute(2,0,1)
-        audio_mel_spectogram = (audio_mel_spectogram - audio_mel_spectogram.min()) / (audio_mel_spectogram.max() - audio_mel_spectogram.min())
+            # if augmentation and self.mode=="train":
+            #     noise = torch.randn(size=(audio.shape[0], audio.shape[1])) / 300
+            #     audio = audio + noise
+            mel_spectrogram = self._get_mel_spectrogram(audio.numpy(), sr)
+            mel_spectrogram = torch.tensor(mel_spectrogram, dtype=torch.float32).permute(2,0,1)
 
-        # save to cache
-        if save_to_cache:
-            audio_mel_spectogram_save = audio_mel_spectogram.permute(1, 2, 0) * 255
-            # plt.imshow( audio_mel_spectogram_save )
-            audio_mel_spectogram_save = audio_mel_spectogram_save.numpy()
-            # plt.imshow( audio_mel_spectogram_save )
-            audio_mel_spectogram_save = audio_mel_spectogram_save.astype(np.uint8)
-            # plt.imshow( audio_mel_spectogram_save )
+            min_intensity = mel_spectrogram.min()
+            max_intensity = mel_spectrogram.max()
+            mel_spectrogram = (mel_spectrogram - min_intensity) / (max_intensity - min_intensity)
 
-            audio_mel_spectogram_save = Image.fromarray(audio_mel_spectogram_save.squeeze(), mode="L")
-            audio_mel_spectogram_save.save(audio_path_cache, mode="L")
+            self._add_to_cache(mel_spectrogram, cache_path)
 
-        audio_mel_spectogram = audio_mel_spectogram.repeat(3, 1, 1)
+        # Add padding if necessary
+        max_spectrogram_rows = int(self.MAX_AUDIO_LENGTH * (sr / 160.0)) + 1 # hop_length = 160
+        mel_spectrogram = torch.nn.functional.pad(
+            mel_spectrogram,
+            (0, 0, 0, max_spectrogram_rows - mel_spectrogram.shape[1]),
+            mode='constant',
+            value=0.0)
+        # Convert to RGB
+        mel_spectrogram = mel_spectrogram.repeat(3, 1, 1)
 
-        # plot
-        # plt.imshow( audio_mel_spectogram.permute(1, 2, 0) )
-
-        return audio_mel_spectogram
+        return mel_spectrogram
 
     def compute_distance(self, anchor, sample):
-        distance = torch.norm(anchor - sample)
+        distance = torch.norm(anchor - sample, p=2)
         return distance
 
     @torch.no_grad()
