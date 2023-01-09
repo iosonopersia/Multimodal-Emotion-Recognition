@@ -10,6 +10,7 @@ DEBUG:
 AUDIO:
     ffmpeg_sr: 16000
     wav2vec_sr: 16000
+    max_duration: 10.0 # seconds
 
 checkpoint:
     save_path: checkpoints/audio_mel/checkpoint.pth
@@ -18,14 +19,15 @@ checkpoint:
     load_checkpoint: False
 
 solver:
-    adaptive_triplet_margin_loss: False
+    len_triplet_picking: 100
+    adaptive_triplet_margin_loss: True
     covariance_loss: True
     variance_loss: True
-    lr: 1.0e-5
-    weight_decay: 1.0e-6
+    lr: 1.0e-4
+    weight_decay: 0.0
     epochs: 50
     scheduler:
-        enabled: False
+        enabled: True
         scheduler_fn: ExponentialLR
         gamma: 0.98
     early_stopping:
