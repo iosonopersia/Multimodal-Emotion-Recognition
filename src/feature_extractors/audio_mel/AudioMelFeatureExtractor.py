@@ -16,10 +16,9 @@ class AudioMelFeatureExtractor(nn.Module):
         # self.resnet18.fc = nn.Identity()
         self.projector = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(1000, 300),
-            # nn.Dropout(0.4),
-            # nn.ReLU(),
-            # nn.Linear(512, 300)
+            nn.Linear(1000, 512),
+            nn.ReLU(),
+            nn.Linear(512, 300)
         )
     def forward(self, x):
         x = self.resnet18(x)
@@ -32,9 +31,9 @@ class TestAudioExtractor(nn.Module):
     def __init__(self, load_checkpoint=True):
         super(TestAudioExtractor, self).__init__()
         self.audio_extractor = AudioMelFeatureExtractor()
-        # self.audio_extractor.eval()
+        self.audio_extractor.eval()
         if load_checkpoint:
-            checkpoint = torch.load("checkpoints/audio_feature_extractor.pth")
+            checkpoint = torch.load("checkpoints/audio_mel/checkpoint.pth")
             self.audio_extractor.load_state_dict(checkpoint['model_state_dict'])
         for param in self.audio_extractor.parameters():
             param.requires_grad = False
@@ -49,7 +48,8 @@ class TestAudioExtractor(nn.Module):
         )
 
     def forward(self, x):
-        x = self.audio_extractor(x)
+        with torch.inference_mode():
+            x = self.audio_extractor(x)
         x = self.classifier(x)
         return x
 
