@@ -382,25 +382,3 @@ class DatasetMelAudio(torch.utils.data.Dataset):
         negative_mask.diagonal()[:] = float("inf") # The negative cannot coincide with the anchor
 
         return negative_mask
-
-    def compute_statistics(self):
-        max_value = 0
-        min_value = float("inf")
-        for i in tqdm(range(len(self.text)), desc="Compute statistics"):
-            utterance = self.text.iloc[i]
-            dialogue_id = utterance["Dialogue_ID"]
-            utterance_id = utterance["Utterance_ID"]
-            audio_path = os.path.join(self.audio_path, f"dia{dialogue_id}_utt{utterance_id}.wav")
-            audio, sr = torchaudio.load(audio_path, format="wav", normalize=True)
-            audio = torch.nn.functional.pad(audio, (0, self.MAX_AUDIO_LENGTH - audio.shape[1]), mode='constant', value=0)
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                audio_mel_spectogram = torchaudio.transforms.MelSpectrogram (sample_rate = sr, n_fft=400, hop_length=160, n_mels=128)(audio)
-                audio_mel_spectogram = torch.tensor(librosa.power_to_db(audio_mel_spectogram))
-                if audio_mel_spectogram.max() > max_value:
-                    max_value = audio_mel_spectogram.max()
-                    # print (max_value)
-                if audio_mel_spectogram.min() < min_value:
-                    min_value = audio_mel_spectogram.min()
-                    # print (min_value)
-        return max_value, min_value
