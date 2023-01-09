@@ -225,13 +225,13 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     n_steps = len(data_train) // batch_size
     # n_steps = 300
     model.eval()
-    for idx_batch in tqdm(range(n_steps), "Training epoch {}".format(epoch)):
+    for idx_batch in tqdm(range(n_steps), desc=f"Epoch {epoch}"):
 
         with torch.inference_mode():
             if epoch < 15:
-                data = data_train.get_batched_triplets(batch_size, model, mining_type="semi-hard") #semi-hard
+                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device) #semi-hard
             else:
-                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard")
+                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
 
         # model.train()
         anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
