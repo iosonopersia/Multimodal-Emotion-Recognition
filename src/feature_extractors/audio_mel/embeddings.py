@@ -3,7 +3,7 @@ from munch import Munch
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import torch
-from datasetAudioMel import DatasetMelAudio
+from dataset import DatasetMelAudio
 from AudioMelFeatureExtractor import AudioMelFeatureExtractor
 from tqdm import tqdm
 import pickle
