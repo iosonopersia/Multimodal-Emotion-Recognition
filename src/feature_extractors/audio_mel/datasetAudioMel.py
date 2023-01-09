@@ -257,11 +257,12 @@ class DatasetMelAudio(torch.utils.data.Dataset):
             positives.append(positive)
             negatives.append(negative)
 
-
         anchors = torch.stack(anchors)
         positives = torch.stack(positives)
         negatives = torch.stack(negatives)
         return anchors, positives, negatives
+
+
 
     @torch.no_grad()
     def mine_hard_triplets(self, batch_size, model, device):
@@ -361,33 +362,25 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
     @torch.no_grad()
     def compute_positive_mask (self, utterances):
+
         n_utterances = len(utterances)
         positive_mask = torch.ones((n_utterances, n_utterances), dtype=torch.float32)
-        positive_mask.diagonal()[:] = 0.0
-
-        for i in range(n_utterances):
-            i_emotion = utterances[i]["Emotion"].iloc[0]
-            for j in range(i+1, n_utterances):
-                j_emotion = utterances[j]["Emotion"].iloc[0]
-                if i_emotion != j_emotion:
-                    positive_mask[i, j] = 0.0
-                    positive_mask[j, i] = 0.0
+        i_emotions = torch.tensor([utterance["Emotion"].iloc[0] for utterance in utterances])
+        j_emotions = i_emotions.unsqueeze(-1)
+        positive_mask = torch.where(i_emotions != j_emotions, torch.tensor(0.0), positive_mask)
+        positive_mask[torch.eye(n_utterances) == 1] = 0.0
 
         return positive_mask
 
     @torch.no_grad()
     def compute_negative_mask (self, utterances):
+
         n_utterances = len(utterances)
         negative_mask = torch.zeros((n_utterances, n_utterances), dtype=torch.float32)
-        negative_mask.diagonal()[:] = float("inf")
-
-        for i in range(n_utterances):
-            i_emotion = utterances[i]["Emotion"].iloc[0]
-            for j in range(i+1, n_utterances):
-                j_emotion = utterances[j]["Emotion"].iloc[0]
-                if i_emotion == j_emotion:
-                    negative_mask[i, j] = float("inf")
-                    negative_mask[j, i] = float("inf")
+        i_emotions = torch.tensor([utterance["Emotion"].iloc[0] for utterance in utterances])
+        j_emotions = i_emotions.unsqueeze(-1)
+        negative_mask = torch.where(i_emotions == j_emotions, float("inf"), negative_mask)
+        negative_mask[torch.eye(n_utterances) == 1] = float("inf")
 
         return negative_mask
 
