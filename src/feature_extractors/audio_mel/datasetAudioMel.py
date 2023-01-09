@@ -362,25 +362,23 @@ class DatasetMelAudio(torch.utils.data.Dataset):
 
     @torch.no_grad()
     def compute_positive_mask (self, utterances):
-
         n_utterances = len(utterances)
         positive_mask = torch.ones((n_utterances, n_utterances), dtype=torch.float32)
         i_emotions = torch.tensor([utterance["Emotion"].iloc[0] for utterance in utterances])
         j_emotions = i_emotions.unsqueeze(-1)
         positive_mask = torch.where(i_emotions != j_emotions, torch.tensor(0.0), positive_mask)
-        positive_mask[torch.eye(n_utterances) == 1] = 0.0
+        positive_mask.diagonal()[:] = 0.0 # The negative cannot coincide with the anchor
 
         return positive_mask
 
     @torch.no_grad()
     def compute_negative_mask (self, utterances):
-
         n_utterances = len(utterances)
         negative_mask = torch.zeros((n_utterances, n_utterances), dtype=torch.float32)
         i_emotions = torch.tensor([utterance["Emotion"].iloc[0] for utterance in utterances])
         j_emotions = i_emotions.unsqueeze(-1)
         negative_mask = torch.where(i_emotions == j_emotions, float("inf"), negative_mask)
-        negative_mask[torch.eye(n_utterances) == 1] = float("inf")
+        negative_mask.diagonal()[:] = float("inf") # The negative cannot coincide with the anchor
 
         return negative_mask
 
