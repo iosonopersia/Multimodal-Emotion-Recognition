@@ -263,7 +263,7 @@ def validate(model, data_val, criterion, device):
     model.eval()
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
-            data = data_val.get_batched_triplets(batch_size, model)
+            data = data_val.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
             anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
 
             anchor_embedding = model(anchor)
