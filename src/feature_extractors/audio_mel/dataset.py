@@ -113,8 +113,9 @@ class Dataset(torch.utils.data.Dataset):
                 raise ValueError(f"Sample rate mismatch: {_sr} != {sr}")
 
             # Truncate waveform to max length in seconds
-            if audio.shape[-1] > self.MAX_AUDIO_LENGTH * sr:
-                audio = audio[..., :self.MAX_AUDIO_LENGTH * sr]
+            max_audio_length = int(self.MAX_AUDIO_LENGTH * sr)
+            if audio.shape[-1] > max_audio_length:
+                audio = audio[..., :max_audio_length]
 
             # if augmentation and self.mode=="train":
             #     noise = torch.randn(size=(audio.shape[0], audio.shape[1])) / 300
