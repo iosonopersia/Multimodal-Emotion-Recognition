@@ -1,7 +1,7 @@
 import os
 import torch
 import wandb
-from dataset import DatasetMelAudio as Dataset
+from dataset import Dataset
 from AudioMelFeatureExtractor import TestAudioExtractor
 from tqdm import tqdm
 from datetime import datetime

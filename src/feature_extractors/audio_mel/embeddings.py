@@ -3,7 +3,7 @@ from munch import Munch
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import torch
-from dataset import DatasetMelAudio
+from dataset import Dataset
 from AudioMelFeatureExtractor import AudioMelFeatureExtractor
 from tqdm import tqdm
 import pickle
@@ -28,9 +28,9 @@ def main():
         'num_workers': 0, # We need to preserve the order of the data
         'pin_memory': True
     }
-    data_train = DatasetMelAudio(mode="train", config=config, compute_statistics=False)
-    data_val = DatasetMelAudio(mode="val", config=config, compute_statistics=False)
-    data_test = DatasetMelAudio(mode="test", config=config, compute_statistics=False)
+    data_train = Dataset(mode="train", config=config)
+    data_val = Dataset(mode="val", config=config)
+    data_test = Dataset(mode="test", config=config)
 
     dl_train = torch.utils.data.DataLoader(data_train, **dataloader_config)
     dl_val = torch.utils.data.DataLoader(data_val, **dataloader_config)

@@ -8,7 +8,7 @@ import numpy as np
 import librosa
 
 
-class DatasetMelAudio(torch.utils.data.Dataset):
+class Dataset(torch.utils.data.Dataset):
     def __init__(self, mode="train", config=None):
         super().__init__()
 

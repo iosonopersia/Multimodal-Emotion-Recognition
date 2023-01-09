@@ -1,7 +1,7 @@
 import os
 import torch
 import wandb
-from dataset import DatasetMelAudio as Dataset
+from dataset import Dataset
 from AudioMelFeatureExtractor import AudioMelFeatureExtractor
 from losses.M2FNetAudioEmbeddingLoss import M2FNetAudioEmbeddingLoss
 from tqdm import tqdm
