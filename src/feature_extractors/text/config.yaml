@@ -32,6 +32,8 @@ val:
         pin_memory: True
 
 test:
+    model_path: checkpoints/text/tuned_roberta_base.pth
+    pretrained_model: roberta-base
     data_loader:
         shuffle: False
         batch_size: 16
