@@ -16,9 +16,9 @@ class AudioMelFeatureExtractor(nn.Module):
         # self.resnet18.fc = nn.Identity()
         self.projector = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(1000, 512),
-            nn.ReLU(),
-            nn.Linear(512, 300)
+            nn.Linear(1000, 300),
+            # nn.ReLU(),
+            # nn.Linear(512, 300)
         )
     def forward(self, x):
         x = self.resnet18(x)
