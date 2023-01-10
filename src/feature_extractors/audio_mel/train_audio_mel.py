@@ -6,7 +6,6 @@ from AudioMelFeatureExtractor import AudioMelFeatureExtractor
 from losses.M2FNetAudioEmbeddingLoss import M2FNetAudioEmbeddingLoss
 from tqdm import tqdm
 from datetime import datetime
-from sklearn.utils import class_weight
 from munch import Munch
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
@@ -218,20 +217,18 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
     return {'loss_values': losses_values}
 
 def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
-    loss_train = 0
+    loss_train = 0.0
     batch_size = data_train.config.train.data_loader.batch_size
     n_steps = len(data_train) // batch_size
     # n_steps = 300
     model.eval()
     for idx_batch in tqdm(range(n_steps), desc=f"Epoch {epoch}"):
-
         with torch.inference_mode():
-            if epoch < 15:
-                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device) #semi-hard
-            else:
-                data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
+            data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
 
-        anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
+        anchor = data["anchor"].to(device)
+        positive = data["positive"].to(device)
+        negative = data["negative"].to(device)
 
         # Feature extractor
         optimizer.zero_grad()
@@ -253,7 +250,7 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     return loss_train / n_steps
 
 def validate(model, data_val, criterion, device):
-    loss_eval = 0
+    loss_eval = 0.0
     batch_size = data_val.config.val.data_loader.batch_size
     n_steps = len(data_val) // batch_size
 
@@ -261,7 +258,9 @@ def validate(model, data_val, criterion, device):
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
             data = data_val.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
-            anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
+            anchor = data["anchor"].to(device)
+            positive = data["positive"].to(device)
+            negative = data["negative"].to(device)
 
             anchor_embedding = model(anchor)
             positive_embedding = model(positive)
