@@ -59,7 +59,7 @@ class Dataset(torch.utils.data.Dataset):
         emotion = utterance["Emotion"]
         emotion = torch.tensor([emotion])
 
-        return {"audio_mel_spectogram": audio_mel_spectogram, "emotion": emotion}
+        return {"idx": idx, "audio_mel_spectogram": audio_mel_spectogram, "emotion": emotion}
 
     def get_labels(self):
         return self.text["Emotion"].to_numpy()
