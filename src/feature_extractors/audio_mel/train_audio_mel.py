@@ -176,8 +176,6 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
 
         visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False, wandb_log=wandb_log)
 
-
-
         lr = optimizer.param_groups[0]['lr']
         if use_scheduler:
             lr_scheduler.step()
@@ -233,7 +231,6 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
             else:
                 data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
 
-        # model.train()
         anchor, positive, negative = data["anchor"].to(device), data["positive"].to(device), data["negative"].to(device)
 
         # Feature extractor
@@ -259,7 +256,7 @@ def validate(model, data_val, criterion, device):
     loss_eval = 0
     batch_size = data_val.config.val.data_loader.batch_size
     n_steps = len(data_val) // batch_size
-    # model.train()
+
     model.eval()
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
@@ -276,36 +273,34 @@ def validate(model, data_val, criterion, device):
 
     return loss_eval / n_steps
 
-def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, save=True, visualize=False, wandb_log=False):
+def visualize_model(model, dataloader, device, visualization_type="3D", epoch=0, save=True, visualize=False, wandb_log=False):
     if visualization_type == "3D":
         tsne = TSNE(n_components=3)
     elif visualization_type == "2D":
-        tsne = TSNE(n_components=2, perplexity=100)
+        tsne = TSNE(n_components=2)
     else:
         raise ValueError("Visualization type not supported")
+
     model.eval()
     embeddings = []
-    predicted_labels = []
     true_labels = []
     with torch.inference_mode():
-        for i, data in tqdm(enumerate(dl_test), "Visualizing", total=len(dl_test)):
-            inputs, labels = data["audio_mel_spectogram"].to(device), data["emotion"].to(device)
+        for batch in tqdm(dataloader, desc="Visualizing", total=len(dataloader)):
+            inputs = batch["audio_mel_spectogram"].to(device)
             outputs = model(inputs)
-            for j in range(len(inputs)):
-                # outputs = tsne.fit_transform(outputs.cpu().detach().numpy())
-                embeddings.append(outputs[j].cpu().detach().numpy())
-                true_labels.append(labels[j].item())
+            embeddings.extend(outputs.cpu().tolist())
+            true_labels.extend(batch["emotion"].squeeze(dim=-1).tolist())
+    embeddings = np.array(embeddings, dtype=np.float32)
+    true_labels = np.array(true_labels, dtype=np.int32)
 
     #silhouette score
     silhouette_score = sklearn.metrics.silhouette_score(embeddings, true_labels)
     print(f"Silhouette score: {silhouette_score}")
 
-
     # visualize embeddings
-    embeddings = PCA(random_state=0).fit_transform(np.array(embeddings))[:,:50]
-    embeddings = tsne.fit_transform(np.array(embeddings))
-    # embeddings = np.array(embeddings)
-    true_labels = np.array(true_labels)
+    embeddings = PCA(random_state=0).fit_transform(embeddings)[:,:50]
+    embeddings = tsne.fit_transform(embeddings)
+
     x = embeddings[:, 0]
     y = embeddings[:, 1]
     if visualization_type == "3D":
@@ -313,15 +308,17 @@ def visualize_model (model, dl_test, device, visualization_type= "3D", epoch=0, 
 
     # Create a scatter plot of the 3D embeddings
     if visualization_type == "3D":
-        fig = px.scatter_3d(x=x, y=y, z=z, text=true_labels, color=true_labels, opacity=0.7, width=800, height=800)
+        fig = px.scatter_3d(x=x, y=y, z=z, color=true_labels, opacity=0.7, width=800, height=800)
     else:
-        fig = px.scatter(x=x, y=y, text=true_labels, color=true_labels, opacity=0.7, width=800, height=800)
+        fig = px.scatter(x=x, y=y, color=true_labels, opacity=0.7, width=800, height=800)
 
-    # Show the plot
-    # fig.show()
+    # Disable hover data
+    fig.update_traces(hovertemplate=None, hoverinfo="skip")
+
     save_dir_png = os.path.join("src","feature_extractors","audio_mel", "visualization", "png")
     save_dir_html = os.path.join("src","feature_extractors","audio_mel", "visualization", "html")
-    # check if directory exists and create it if not
+
+    # check if directory exists and create it if doesn't
     if not os.path.exists(save_dir_png):
         os.makedirs(save_dir_png)
     if not os.path.exists(save_dir_html):
