@@ -6,19 +6,37 @@ import torchaudio
 from PIL import Image
 import numpy as np
 import librosa
+import audiomentations
+from audiomentations import AddGaussianSNR, TimeStretch, PitchShift, Shift
+from tqdm import tqdm
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, mode="train", config=None):
+    def __init__(self, mode="train", config=None, generate_mel_spectrograms=False):
         super().__init__()
 
         self.config = config
         self.MAX_AUDIO_LENGTH = config.AUDIO.max_duration # seconds
         self.len_triplet_picking = config.solver.len_triplet_picking
         self.mode = mode
+        # add augmentation to images
+        self.audio_transforms = audiomentations.Compose([
+            AddGaussianSNR(min_snr_in_db=5, max_snr_in_db=40.0, p=0.5),
+            TimeStretch(min_rate=0.8, max_rate=1.25, p=0.5),
+            PitchShift(min_semitones=-4, max_semitones=4, p=0.5),
+            Shift(min_fraction=-0.5, max_fraction=0.5, p=0.5),
+        ])
+
+        self.augmentation_factor = config.AUDIO.augmentation_factor
+        if self.augmentation_factor <= 0:
+            self.augmentation_factor = 1
+
         if self.mode == "train":
             self.audio_path = "data/MELD.Raw/train_splits/wav"
             self.mel_spectrogram_cache = "data/MELD.Raw/train_splits/mel_spectrograms"
+            self.augmentation_cache = "data/MELD.Raw/train_splits/augmentation"
+            self.augmentation_cache = os.path.abspath(self.augmentation_cache)
+            os.makedirs(self.augmentation_cache, exist_ok=True)
         elif self.mode == "val":
             self.audio_path = "data/MELD.Raw/dev_splits_complete/wav"
             self.mel_spectrogram_cache = "data/MELD.Raw/dev_splits_complete/mel_spectrograms"
@@ -43,6 +61,11 @@ class Dataset(torch.utils.data.Dataset):
         self.dialogue_ids = self.text["Dialogue_ID"].unique()
         print(f"Loaded {len(self.dialogue_ids)} dialogues for {self.mode}ing")
 
+        # Generate mel spectrograms beforehand
+        if generate_mel_spectrograms:
+            self._generate_all_mel_spectograms()
+
+
     def __len__(self):
         return len(self.text)
 
@@ -53,7 +76,7 @@ class Dataset(torch.utils.data.Dataset):
 
         # Audio
         wav_path = os.path.join(self.audio_path, f"dia{dialogue_id}_utt{utterance_id}.wav")
-        audio_mel_spectogram = self.get_mel_spectrogram(wav_path)
+        audio_mel_spectogram = self.get_mel_spectrogram(wav_path, augment=False)
 
         # Emotion
         emotion = utterance["Emotion"]
@@ -89,17 +112,28 @@ class Dataset(torch.utils.data.Dataset):
 
         return mel_spectrogram
 
-    def get_mel_spectrogram(self, audio_path):
+    def get_mel_spectrogram(self, audio_path, augment=True):
         '''
         transform audio into 2D Mel Spectrogram (RGB) :
             the Short Time Fourier transform (STFT) is used with the frame length of 400 samples (25 ms) and hop length of
             160 samples (10ms).
             We also use 128 Mel filter banks to generate the Mel Spectrogram
         '''
-        # augmentation = False
-        cache_path = os.path.basename(audio_path)
-        cache_path = cache_path.split(".")[0]
-        cache_path = os.path.join(self.mel_spectrogram_cache, f"{cache_path}.png")
+        #choose whether to use augmentation or not
+        if self.mode == "train" and augment==True:
+            augment = random.randint (0, self.augmentation_factor - 1)
+        else:
+            augment = 0
+
+        if augment == 0:
+            cache_path = os.path.basename(audio_path)
+            cache_path = cache_path.split(".")[0]
+            cache_path = os.path.join(self.mel_spectrogram_cache, f"{cache_path}.png")
+        else:
+            cache_path = os.path.basename(audio_path)
+            cache_path = cache_path.split(".")[0]
+            cache_path = os.path.join(self.augmentation_cache, f"{cache_path}_{augment}.png")
+
 
         sr = self.config.AUDIO.ffmpeg_sr
 
@@ -117,10 +151,11 @@ class Dataset(torch.utils.data.Dataset):
             if audio.shape[-1] > max_audio_length:
                 audio = audio[..., :max_audio_length]
 
-            # if augmentation and self.mode=="train":
-            #     noise = torch.randn(size=(audio.shape[0], audio.shape[1])) / 300
-            #     audio = audio + noise
-            mel_spectrogram = self._get_mel_spectrogram(audio.numpy(), sr)
+            audio = audio.numpy()
+            if augment > 0:
+                audio = self.audio_transforms(audio, sample_rate=sr)
+
+            mel_spectrogram = self._get_mel_spectrogram(audio, sr)
             mel_spectrogram = torch.tensor(mel_spectrogram, dtype=torch.float32)
 
             min_intensity = mel_spectrogram.min()
@@ -376,3 +411,56 @@ class Dataset(torch.utils.data.Dataset):
         negative_mask.diagonal()[:] = float("inf") # The negative cannot coincide with the anchor
 
         return negative_mask
+
+    def _generate_all_mel_spectograms(self):
+        sr = self.config.AUDIO.ffmpeg_sr
+        for _, utterance in tqdm(self.text.iterrows(), "Generating mel spectograms", total=len(self.text)):
+            dialogue_id = utterance["Dialogue_ID"]
+            utterance_id = utterance["Utterance_ID"]
+            audio_path = os.path.join(self.audio_path, f"dia{dialogue_id}_utt{utterance_id}.wav")
+            audio, _sr = torchaudio.load(audio_path, format="wav", normalize=True)
+            if _sr != sr:
+                raise ValueError(f"Sample rate mismatch: {_sr} != {sr}")
+
+            # Truncate waveform to max length in seconds
+            max_audio_length = int(self.MAX_AUDIO_LENGTH * sr)
+            if audio.shape[-1] > max_audio_length:
+                audio = audio[..., :max_audio_length]
+
+            audio = audio.numpy()
+            if self.mode == "train":
+                for augment in range(self.augmentation_factor):
+                    if augment == 0:
+                        cache_path = os.path.basename(audio_path)
+                        cache_path = cache_path.split(".")[0]
+                        cache_path = os.path.join(self.mel_spectrogram_cache, f"{cache_path}.png")
+                    else:
+                        cache_path = os.path.basename(audio_path)
+                        cache_path = cache_path.split(".")[0]
+                        cache_path = os.path.join(self.augmentation_cache, f"{cache_path}_{augment}.png")
+
+                    if augment > 0:
+                        audio = self.audio_transforms(audio, sample_rate=sr)
+
+                    mel_spectrogram = self._get_mel_spectrogram(audio, sr)
+                    mel_spectrogram = torch.tensor(mel_spectrogram, dtype=torch.float32)
+
+                    min_intensity = mel_spectrogram.min()
+                    max_intensity = mel_spectrogram.max()
+                    mel_spectrogram = (mel_spectrogram - min_intensity) / (max_intensity - min_intensity)
+
+                    self._add_to_cache(mel_spectrogram, cache_path)
+            else:
+                cache_path = os.path.basename(audio_path)
+                cache_path = cache_path.split(".")[0]
+                cache_path = os.path.join(self.mel_spectrogram_cache, f"{cache_path}.png")
+                mel_spectrogram = self._get_mel_spectrogram(audio, sr)
+                mel_spectrogram = torch.tensor(mel_spectrogram, dtype=torch.float32)
+
+                min_intensity = mel_spectrogram.min()
+                max_intensity = mel_spectrogram.max()
+                mel_spectrogram = (mel_spectrogram - min_intensity) / (max_intensity - min_intensity)
+
+                self._add_to_cache(mel_spectrogram, cache_path)
+
+
