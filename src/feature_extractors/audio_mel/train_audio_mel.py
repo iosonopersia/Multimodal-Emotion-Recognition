@@ -35,12 +35,6 @@ def main(config=None):
     # VAL DATA
     data_val = Dataset(mode="val", config=config)
 
-    # TEST DATA
-    data_test = Dataset(mode="train", config=config)
-
-    test_dl_cfg = config.test.data_loader
-    dl_test = torch.utils.data.DataLoader(data_test, **test_dl_cfg)
-
     #============MODEL===============
     #--------------------------------
     model = AudioMelFeatureExtractor().to(device)
@@ -103,7 +97,6 @@ def main(config=None):
             model,
             data_train,
             data_val,
-            dl_test,
             criterion,
             optimizer,
             lr_scheduler,
@@ -113,11 +106,10 @@ def main(config=None):
             # hyperparameter_search
         )
         print("Training complete")
-    if config.DEBUG.visualize:
-        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, save=False, visualize=True)
 
 
-def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_scheduler, start_epoch, config, device):
+
+def training_loop(model, data_train, data_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -173,7 +165,7 @@ def training_loop(model, data_train, data_val,dl_test, criterion, optimizer, lr_
             'optimizer_state_dict': optimizer.state_dict(),
             }, save_checkpoint_path)
 
-        visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False, wandb_log=wandb_log)
+        # visualize_model(model, dl_test, device, config.DEBUG.visualization_type, epoch=epoch, save=True, visualize=False, wandb_log=wandb_log)
 
         lr = optimizer.param_groups[0]['lr']
         if use_scheduler:
