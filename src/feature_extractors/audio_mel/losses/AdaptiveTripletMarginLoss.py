@@ -33,7 +33,8 @@ class AdaptiveTripletMarginLoss(torch.nn.Module):
         distance_positive_negative = self.distance(positive, negative)
         margin = self.adaptive_margin(distance_anchor_positive, distance_anchor_negative)
 
-        return distance_anchor_positive - (torch.add(distance_anchor_negative, distance_positive_negative) / 2.0) + margin
+        loss = distance_anchor_positive - ((distance_anchor_negative + distance_positive_negative) / 2.0) + margin
+        return torch.nn.functional.relu(loss)
 
     def adaptive_margin(self, distance_anchor_positive: Tensor, distance_anchor_negative: Tensor) -> Tensor:
         margin_sim = 1.0 + 2.0 / (torch.exp(4.0 * distance_anchor_positive) + self.eps)
