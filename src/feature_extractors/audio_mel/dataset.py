@@ -355,7 +355,11 @@ class Dataset(torch.utils.data.Dataset):
         losses = torch.tensor( [distance_matrix[index,p] - distance_matrix[index, n] for index,(p,n) in enumerate(zip(positive_index, negative_index))])
 
         # take the batch_size biggest losses
-        _, indices = torch.topk(losses, batch_size, sorted=False)
+        if self.mode == "train":
+            _, indices = torch.topk(losses, (self.len_triplet_picking // batch_size) * batch_size, sorted=False)
+        else:
+            _, indices = torch.topk(losses, batch_size, sorted=False)
+
 
         # get the corresponding utterances of index, p, and n
         index = [utterances[i] for i in indices]

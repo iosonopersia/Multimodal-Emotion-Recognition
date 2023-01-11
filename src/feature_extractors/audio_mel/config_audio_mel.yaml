@@ -11,7 +11,7 @@ AUDIO:
     ffmpeg_sr: 16000
     wav2vec_sr: 16000
     max_duration: 10.0 # seconds
-    augmentation_factor : 1 # choose the number of augmentation to do for each image, 1 to disable augmentation
+    augmentation_factor : 2 # choose the number of augmentation to do for each image, 1 to disable augmentation
 
 checkpoint:
     save_path: checkpoints/audio_mel/checkpoint.pth

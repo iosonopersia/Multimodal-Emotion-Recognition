@@ -139,7 +139,7 @@ def training_loop(model, data_train, data_val, criterion, optimizer, lr_schedule
             log_graph=False)
 
     if early_stopping:
-        min_loss_val = float('inf')
+        max_loss_val = 0
         patience_counter = 0
 
         if config.checkpoint.load_checkpoint:
@@ -192,8 +192,8 @@ def training_loop(model, data_train, data_val, criterion, optimizer, lr_schedule
 
         # Early stopping
         if early_stopping:
-            if loss_val < min_loss_val:
-                min_loss_val = loss_val
+            if loss_val > max_loss_val:
+                max_loss_val = loss_val
                 patience_counter = 0
                 if restore_best_weights:
                     torch.save({
@@ -225,24 +225,29 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     loss_train = 0.0
     batch_size = data_train.config.train.data_loader.batch_size
     n_steps = len(data_train) // batch_size
-    # n_steps = 300
+    # n_steps = 640
     model.eval()
     for idx_batch in tqdm(range(n_steps), desc=f"Epoch {epoch}"):
         with torch.inference_mode():
             data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
 
-        anchor = data["anchor"].to(device)
-        positive = data["positive"].to(device)
-        negative = data["negative"].to(device)
-
-        # Feature extractor
+        loss = 0.0
         optimizer.zero_grad()
-        anchor_embedding = model(anchor)
-        positive_embedding = model(positive)
-        negative_embedding = model(negative)
-        loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
+        num_iteration = data["anchor"].shape[0] // batch_size
+        for i in range(num_iteration):
+            anchor = data["anchor"][i*batch_size:(i+1)*batch_size].to(device)
+            positive = data["positive"][i*batch_size:(i+1)*batch_size].to(device)
+            negative = data["negative"][i*batch_size:(i+1)*batch_size].to(device)
 
-        loss.backward()
+            # Feature extractor
+            anchor_embedding = model(anchor)
+            positive_embedding = model(positive)
+            negative_embedding = model(negative)
+            loss_i = criterion(anchor_embedding, positive_embedding, negative_embedding)
+            loss_i.backward()
+            loss += loss_i
+
+        loss = loss / num_iteration
         optimizer.step()
 
         loss_train += loss.item()
@@ -258,11 +263,13 @@ def validate(model, data_val, criterion, device):
     loss_eval = 0.0
     batch_size = data_val.config.val.data_loader.batch_size
     n_steps = len(data_val) // batch_size
+    total_triplets = 0
+    good_triplets = 0
 
     model.eval()
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
-            data = data_val.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
+            data = data_val.get_batched_triplets(batch_size, model, mining_type="random", device=device)
             anchor = data["anchor"].to(device)
             positive = data["positive"].to(device)
             negative = data["negative"].to(device)
@@ -271,11 +278,18 @@ def validate(model, data_val, criterion, device):
             positive_embedding = model(positive)
             negative_embedding = model(negative)
 
-            loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
+            # compute distance betweem anchor and positive and anchor and negative
+            distance_positive = torch.norm(anchor_embedding - positive_embedding, dim=1)
+            distance_negative = torch.norm(anchor_embedding - negative_embedding, dim=1)
+            distance_positive_negative = distance_positive - distance_negative
+            good_triplets += torch.sum(distance_positive_negative < 0)
+            total_triplets += distance_positive_negative.shape[0]
+            # loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
 
-            loss_eval += loss.item()
+            # loss_eval += loss.item()
 
-    return loss_eval / n_steps
+    # return loss_eval / n_steps
+    return good_triplets / total_triplets
 
 def visualize_model(model, dataloader, device, visualization_type="3D", epoch=0, save=True, visualize=False, wandb_log=False):
     if visualization_type == "3D":
