@@ -13,17 +13,16 @@ class AudioMelFeatureExtractor(nn.Module):
         self.resnet18 = resnet18(weights=None)
         checkpoint = torch.load("checkpoints/EmoResnet.pth")
         self.resnet18.load_state_dict(checkpoint['model_state_dict'])
-        # self.resnet18.fc = nn.Identity()
+
         self.projector = nn.Sequential(
             nn.ReLU(),
             nn.Linear(1000, 300),
-            # nn.ReLU(),
-            # nn.Linear(512, 300)
         )
+
     def forward(self, x):
         x = self.resnet18(x)
         x = self.projector(x)
-        x = normalize(x, p=2, dim=1)
+        x = normalize(x, p=2, dim=-1)
         return x
 
 # add to AudioMelFeatureExtractor class a classification head for emotion (output 7 classes)
