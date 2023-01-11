@@ -55,16 +55,6 @@ def main(config=None):
     #------------------------------------
     optimizer = torch.optim.Adam(model.parameters(), lr=config.solver.lr, weight_decay=config.solver.weight_decay)
 
-    #============WRITER==============
-    if config.wandb.enabled:
-        os_start_method = 'spawn' if os.name == 'nt' else 'fork'
-        run_datetime = datetime.now().isoformat().split('.')[0]
-        wandb.init(
-            project=config.wandb.project_name,
-            name=run_datetime,
-            config=config,
-            settings=wandb.Settings(start_method=os_start_method))
-
     #============SCHEDULER===============
     #------------------------------------
     lr_scheduler = None
@@ -89,6 +79,20 @@ def main(config=None):
         else:
             raise ValueError("Checkpoint not found")
 
+    #============WRITER==============
+    if config.wandb.enabled:
+        resume_run = config.wandb.resume_run
+        resume_run_id = config.wandb.resume_run_id
+        os_start_method = 'spawn' if os.name == 'nt' else 'fork'
+        run_datetime = datetime.now().isoformat().split('.')[0]
+        wandb.init(
+            project=config.wandb.project_name,
+            name=run_datetime,
+            config=config,
+            settings=wandb.Settings(start_method=os_start_method),
+            resume="must" if resume_run else False,
+            id=resume_run_id)
+
     #============TRAIN===============
     #--------------------------------
     if config.DEBUG.train:
@@ -106,7 +110,6 @@ def main(config=None):
             # hyperparameter_search
         )
         print("Training complete")
-
 
 
 def training_loop(model, data_train, data_val, criterion, optimizer, lr_scheduler, start_epoch, config, device):
