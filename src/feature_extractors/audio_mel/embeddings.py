@@ -4,7 +4,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 import torch
 from dataset import Dataset
-from AudioMelFeatureExtractor import AudioMelFeatureExtractor
+from model import AudioMelFeatureExtractor
 from tqdm import tqdm
 import pickle
 import numpy as np

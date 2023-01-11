@@ -2,7 +2,7 @@ import os
 import torch
 import wandb
 from dataset import Dataset
-from AudioMelFeatureExtractor import AudioMelFeatureExtractor
+from model import AudioMelFeatureExtractor
 from losses.M2FNetAudioEmbeddingLoss import M2FNetAudioEmbeddingLoss
 from tqdm import tqdm
 from datetime import datetime

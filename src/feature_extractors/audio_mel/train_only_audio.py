@@ -2,7 +2,7 @@ import os
 import torch
 import wandb
 from dataset import Dataset
-from AudioMelFeatureExtractor import TestAudioExtractor
+from model import TestAudioExtractor
 from tqdm import tqdm
 from datetime import datetime
 from sklearn.metrics import accuracy_score, f1_score
