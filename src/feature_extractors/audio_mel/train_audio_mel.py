@@ -142,6 +142,15 @@ def training_loop(model, data_train, data_val, criterion, optimizer, lr_schedule
         min_loss_val = float('inf')
         patience_counter = 0
 
+        if config.checkpoint.load_checkpoint:
+            checkpoint_folder = os.path.dirname(config.checkpoint.load_path)
+            best_weights_path = os.path.join(os.path.abspath(checkpoint_folder), 'best_weights.pth')
+            if os.path.exists(best_weights_path):
+                best_weights = torch.load(best_weights_path)
+                min_loss_val = best_weights['min_loss_val']
+                patience_counter = start_epoch - (best_weights['epoch'] + 1)
+                patience_counter = max(0, patience_counter)
+
     for epoch in range(start_epoch, epochs):
         loss_train = train(
             model,
@@ -189,6 +198,7 @@ def training_loop(model, data_train, data_val, criterion, optimizer, lr_schedule
                 if restore_best_weights:
                     torch.save({
                         'epoch': epoch,
+                        'min_loss_val': min_loss_val,
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
                         }, save_checkpoint_path.rsplit("/", 1)[0]+"/best_weights.pth")
