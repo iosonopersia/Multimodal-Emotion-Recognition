@@ -226,7 +226,8 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     batch_size = data_train.config.train.data_loader.batch_size
     n_steps = len(data_train) // batch_size * 5
     # n_steps = 640
-    model.eval()
+    model.train()
+    model.set_bn_eval()
     for idx_batch in tqdm(range(n_steps), desc=f"Epoch {epoch}"):
         with torch.inference_mode():
             data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
