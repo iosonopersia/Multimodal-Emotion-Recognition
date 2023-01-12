@@ -295,40 +295,47 @@ class Dataset(torch.utils.data.Dataset):
         negatives = torch.stack(negatives)
         return anchors, positives, negatives
 
-    @torch.no_grad()
-    def mine_hard_triplets(self, batch_size, model, device):
-        embeddings = []
+    # @torch.no_grad()
+    def mine_hard_triplets(self, batch_size, model, device, criterion=None):
+
         utterances = []
         anchor = []
         positive = []
         negative = []
         len_triplet_picking = (self.len_triplet_picking // batch_size)
-        for _ in range(len_triplet_picking):
+        embeddings = torch.zeros((len_triplet_picking*batch_size, 300)).to(device)
+        for i in range(len_triplet_picking):
             random_audio_mel_spectograms = []
-            for _ in range(batch_size):
-                emotion = random.choice(list(self.emotion_labels.values()))
-                random_utterance = self.text[self.text["Emotion"]==emotion].sample()
-                # random_utterance = self.text.sample()
+            with torch.no_grad():
+                for _ in range(batch_size):
 
-                random_dialogue_id = random_utterance["Dialogue_ID"].iloc[0]
-                random_utterance_id = random_utterance["Utterance_ID"].iloc[0]
+                    emotion = random.choice(list(self.emotion_labels.values()))
+                    random_utterance = self.text[self.text["Emotion"]==emotion].sample()
+                    # random_utterance = self.text.sample()
 
-                utterances.append(random_utterance)
+                    random_dialogue_id = random_utterance["Dialogue_ID"].iloc[0]
+                    random_utterance_id = random_utterance["Utterance_ID"].iloc[0]
 
-                # Load the audio
-                random_wav_path = os.path.join(self.audio_path, f"dia{random_dialogue_id}_utt{random_utterance_id}.wav")
+                    utterances.append(random_utterance)
 
-                # Get mel spectogram
-                random_audio_mel_spectogram = self.get_mel_spectrogram(random_wav_path)
-                random_audio_mel_spectograms.append(random_audio_mel_spectogram)
+                    # Load the audio
+                    random_wav_path = os.path.join(self.audio_path, f"dia{random_dialogue_id}_utt{random_utterance_id}.wav")
 
-                # Compute the embedding
-            random_audio_mel_spectograms = torch.stack(random_audio_mel_spectograms).to(device)
-            random_embeddings = model(random_audio_mel_spectograms).detach().cpu()
-            embeddings.extend(random_embeddings)
+                    # Get mel spectogram
+                    random_audio_mel_spectogram = self.get_mel_spectrogram(random_wav_path)
+                    random_audio_mel_spectograms.append(random_audio_mel_spectogram)
+
+                        # Compute the embedding
+                random_audio_mel_spectograms = torch.stack(random_audio_mel_spectograms).to(device)
+
+            random_embeddings = model(random_audio_mel_spectograms)#.detach().cpu()
+            embeddings[i*batch_size:(i+1)*batch_size] = random_embeddings
 
         # compute the distance matrix
-        embeddings = torch.stack(embeddings).squeeze()
+        #embeddings = torch.stack(embeddings).squeeze()
+        # if self.mode == "train":
+        #     embeddings.requires_grad = True
+
         distance_matrix = torch.cdist(embeddings, embeddings, p=2)
 
         # POSITIVE
@@ -336,7 +343,7 @@ class Dataset(torch.utils.data.Dataset):
         positive_mask = self.compute_positive_mask(utterances)
 
         # put to 0 the value of distance matrix where the mask is 0
-        distance_matrix_positive = distance_matrix * positive_mask
+        distance_matrix_positive = distance_matrix * positive_mask.cuda()
 
         # get the index of the max value in the distance matrix positive
         positive_index = torch.argmax(distance_matrix_positive, dim=1)
@@ -346,7 +353,7 @@ class Dataset(torch.utils.data.Dataset):
         negative_mask = self.compute_negative_mask(utterances)
 
         # put to inf the value of distance matrix where the mask is inf
-        distance_matrix_negative = distance_matrix + negative_mask
+        distance_matrix_negative = distance_matrix + negative_mask.cuda()
 
         # get the index of the min value in the distance matrix negative
         negative_index = torch.argmin(distance_matrix_negative, dim=1)
@@ -360,41 +367,46 @@ class Dataset(torch.utils.data.Dataset):
         else:
             _, indices = torch.topk(losses, batch_size, sorted=False)
 
+        embeddings_anchors = embeddings[indices]
+        embeddings_positives = embeddings[positive_index[indices]]
+        embeddings_negatives = embeddings[negative_index[indices]]
+        #compute the triplet loss
+        loss = criterion(embeddings_anchors,  embeddings_positives, embeddings_negatives)
+        return loss
+        # # get the corresponding utterances of index, p, and n
+        # index = [utterances[i] for i in indices]
+        # p = [utterances[i] for i in positive_index[indices]]
+        # n = [utterances[i] for i in negative_index[indices]]
 
-        # get the corresponding utterances of index, p, and n
-        index = [utterances[i] for i in indices]
-        p = [utterances[i] for i in positive_index[indices]]
-        n = [utterances[i] for i in negative_index[indices]]
+        # # get the corresponding mel spectogram of index, p, and n
+        # for index_utterance, p_utterance, n_utterance in zip(index, p, n):
+        #     index_dialogue_id = index_utterance["Dialogue_ID"].iloc[0]
+        #     index_utterance_id = index_utterance["Utterance_ID"].iloc[0]
+        #     p_dialogue_id = p_utterance["Dialogue_ID"].iloc[0]
+        #     p_utterance_id = p_utterance["Utterance_ID"].iloc[0]
+        #     n_dialogue_id = n_utterance["Dialogue_ID"].iloc[0]
+        #     n_utterance_id = n_utterance["Utterance_ID"].iloc[0]
 
-        # get the corresponding mel spectogram of index, p, and n
-        for index_utterance, p_utterance, n_utterance in zip(index, p, n):
-            index_dialogue_id = index_utterance["Dialogue_ID"].iloc[0]
-            index_utterance_id = index_utterance["Utterance_ID"].iloc[0]
-            p_dialogue_id = p_utterance["Dialogue_ID"].iloc[0]
-            p_utterance_id = p_utterance["Utterance_ID"].iloc[0]
-            n_dialogue_id = n_utterance["Dialogue_ID"].iloc[0]
-            n_utterance_id = n_utterance["Utterance_ID"].iloc[0]
+        #     # Load the audio
+        #     index_wav_path = os.path.join(self.audio_path, f"dia{index_dialogue_id}_utt{index_utterance_id}.wav")
+        #     p_wav_path = os.path.join(self.audio_path, f"dia{p_dialogue_id}_utt{p_utterance_id}.wav")
+        #     n_wav_path = os.path.join(self.audio_path, f"dia{n_dialogue_id}_utt{n_utterance_id}.wav")
 
-            # Load the audio
-            index_wav_path = os.path.join(self.audio_path, f"dia{index_dialogue_id}_utt{index_utterance_id}.wav")
-            p_wav_path = os.path.join(self.audio_path, f"dia{p_dialogue_id}_utt{p_utterance_id}.wav")
-            n_wav_path = os.path.join(self.audio_path, f"dia{n_dialogue_id}_utt{n_utterance_id}.wav")
+        #     # Get mel spectogram
+        #     index_audio_mel_spectogram = self.get_mel_spectrogram(index_wav_path)
+        #     p_audio_mel_spectogram = self.get_mel_spectrogram(p_wav_path)
+        #     n_audio_mel_spectogram = self.get_mel_spectrogram(n_wav_path)
 
-            # Get mel spectogram
-            index_audio_mel_spectogram = self.get_mel_spectrogram(index_wav_path)
-            p_audio_mel_spectogram = self.get_mel_spectrogram(p_wav_path)
-            n_audio_mel_spectogram = self.get_mel_spectrogram(n_wav_path)
+        #     anchor.append(index_audio_mel_spectogram)
+        #     positive.append(p_audio_mel_spectogram)
+        #     negative.append(n_audio_mel_spectogram)
 
-            anchor.append(index_audio_mel_spectogram)
-            positive.append(p_audio_mel_spectogram)
-            negative.append(n_audio_mel_spectogram)
+        # anchors = torch.stack(anchor)
+        # positives = torch.stack(positive)
+        # negatives = torch.stack(negative)
+        # return anchors, positives, negatives
 
-        anchors = torch.stack(anchor)
-        positives = torch.stack(positive)
-        negatives = torch.stack(negative)
-        return anchors, positives, negatives
-
-    @torch.no_grad()
+    # @torch.no_grad()
     def compute_positive_mask (self, utterances):
         n_utterances = len(utterances)
         positive_mask = torch.ones((n_utterances, n_utterances), dtype=torch.float32)
@@ -405,7 +417,7 @@ class Dataset(torch.utils.data.Dataset):
 
         return positive_mask
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def compute_negative_mask (self, utterances):
         n_utterances = len(utterances)
         negative_mask = torch.zeros((n_utterances, n_utterances), dtype=torch.float32)

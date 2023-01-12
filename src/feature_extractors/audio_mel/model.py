@@ -11,9 +11,9 @@ class AudioMelFeatureExtractor(nn.Module):
     def __init__(self):
         super(AudioMelFeatureExtractor, self).__init__()
         self.resnet18 = resnet18(weights=None)
-        checkpoint = torch.load("checkpoints/EmoResnet.pth")
-        self.resnet18.load_state_dict(checkpoint['model_state_dict'])
-        self.append_dropout(self.resnet18)
+        # checkpoint = torch.load("checkpoints/EmoResnet.pth")
+        # self.resnet18.load_state_dict(checkpoint['model_state_dict'])
+        # self.append_dropout(self.resnet18)
         self.projector = nn.Sequential(
             nn.ReLU(),
             nn.Linear(1000, 300),
@@ -31,6 +31,13 @@ class AudioMelFeatureExtractor(nn.Module):
             if classname.find('BatchNorm') != -1:
                 m.eval()
         self.resnet18.apply(_set_bn_eval)
+
+    def set_bn_train(self):
+        def _set_bn_train(m):
+            classname = m.__class__.__name__
+            if classname.find('BatchNorm') != -1:
+                m.train()
+        self.resnet18.apply(_set_bn_train)
 
 
     def append_dropout(self, model, rate=0.2):

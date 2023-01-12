@@ -227,30 +227,34 @@ def train(model, data_train, criterion, optimizer, epoch, wandb_log, device):
     n_steps = len(data_train) // batch_size * 5
     # n_steps = 640
     model.train()
-    model.set_bn_eval()
     for idx_batch in tqdm(range(n_steps), desc=f"Epoch {epoch}"):
-        with torch.inference_mode():
-            data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
+        # with torch.inference_mode():
+        #     model.set_bn_eval()
+        #     data = data_train.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
+        #     model.set_bn_train()
 
-        loss = 0.0
+        # loss = 0.0
+        # optimizer.zero_grad()
+        # num_iteration = data["anchor"].shape[0] // batch_size
+        # for i in range(num_iteration):
+        #     anchor = data["anchor"][i*batch_size:(i+1)*batch_size].to(device)
+        #     positive = data["positive"][i*batch_size:(i+1)*batch_size].to(device)
+        #     negative = data["negative"][i*batch_size:(i+1)*batch_size].to(device)
+
+        #     # Feature extractor
+        #     anchor_embedding = model(anchor)
+        #     positive_embedding = model(positive)
+        #     negative_embedding = model(negative)
+        #     loss_i = criterion(anchor_embedding, positive_embedding, negative_embedding)
+        #     loss_i.backward()
+        #     loss += loss_i
+
+        # loss = loss / num_iteration
+        # optimizer.step()
         optimizer.zero_grad()
-        num_iteration = data["anchor"].shape[0] // batch_size
-        for i in range(num_iteration):
-            anchor = data["anchor"][i*batch_size:(i+1)*batch_size].to(device)
-            positive = data["positive"][i*batch_size:(i+1)*batch_size].to(device)
-            negative = data["negative"][i*batch_size:(i+1)*batch_size].to(device)
-
-            # Feature extractor
-            anchor_embedding = model(anchor)
-            positive_embedding = model(positive)
-            negative_embedding = model(negative)
-            loss_i = criterion(anchor_embedding, positive_embedding, negative_embedding)
-            loss_i.backward()
-            loss += loss_i
-
-        loss = loss / num_iteration
+        loss = data_train.mine_hard_triplets(batch_size, model, device, criterion=criterion)
+        loss.backward()
         optimizer.step()
-
         loss_train += loss.item()
 
         if wandb_log:
@@ -270,22 +274,23 @@ def validate(model, data_val, criterion, device):
     model.eval()
     with torch.inference_mode():
         for _ in tqdm(range(n_steps), "Validation"):
-            data = data_val.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
-            anchor = data["anchor"].to(device)
-            positive = data["positive"].to(device)
-            negative = data["negative"].to(device)
+            # data = data_val.get_batched_triplets(batch_size, model, mining_type="hard", device=device)
+            # anchor = data["anchor"].to(device)
+            # positive = data["positive"].to(device)
+            # negative = data["negative"].to(device)
 
-            anchor_embedding = model(anchor)
-            positive_embedding = model(positive)
-            negative_embedding = model(negative)
+            # anchor_embedding = model(anchor)
+            # positive_embedding = model(positive)
+            # negative_embedding = model(negative)
 
-            # compute distance betweem anchor and positive and anchor and negative
-            # distance_positive = torch.norm(anchor_embedding - positive_embedding, dim=1)
-            # distance_negative = torch.norm(anchor_embedding - negative_embedding, dim=1)
-            # distance_positive_negative = distance_positive - distance_negative
-            # good_triplets += torch.sum(distance_positive_negative < 0)
-            # total_triplets += distance_positive_negative.shape[0]
-            loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
+            # # compute distance between anchor and positive and anchor and negative
+            # # distance_positive = torch.norm(anchor_embedding - positive_embedding, dim=1)
+            # # distance_negative = torch.norm(anchor_embedding - negative_embedding, dim=1)
+            # # distance_positive_negative = distance_positive - distance_negative
+            # # good_triplets += torch.sum(distance_positive_negative < 0)
+            # # total_triplets += distance_positive_negative.shape[0]
+            # loss = criterion(anchor_embedding, positive_embedding, negative_embedding)
+            loss = data_val.mine_hard_triplets(batch_size, model, device, criterion=criterion)
 
             loss_eval += loss.item()
 
