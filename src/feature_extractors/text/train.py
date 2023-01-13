@@ -35,11 +35,6 @@ def main(config=None):
     val_dl_cfg = config.val.data_loader
     dl_val = torch.utils.data.DataLoader(data_val, collate_fn=collate_fn, **val_dl_cfg)
 
-    # TEST DATA
-    data_test = Dataset(mode="test")
-    test_dl_cfg = config.test.data_loader
-    dl_test = torch.utils.data.DataLoader(data_test, collate_fn=collate_fn, **test_dl_cfg)
-
     #============MODEL===============
     #--------------------------------
     model = TextERC().to(device)
@@ -89,7 +84,6 @@ def main(config=None):
         model,
         dl_train,
         dl_val,
-        dl_test,
         criterion,
         optimizer,
         frozen_epochs_optimizer,
@@ -100,7 +94,7 @@ def main(config=None):
     print("Training complete")
 
 
-def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen_epochs_optimizer, lr_scheduler, config, device):
+def training_loop(model, dl_train, dl_val, criterion, optimizer, frozen_epochs_optimizer, lr_scheduler, config, device):
     losses_values = []
     val_losses_values = []
 
@@ -162,12 +156,6 @@ def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen
             device)
         val_losses_values.append(loss_val)
 
-        loss_test, accuracy_test, weighted_f1_test = validate(
-            model,
-            dl_test,
-            criterion,
-            device)
-
         if save_checkpoint:
             torch.save({
                 'epoch': epoch,
@@ -183,9 +171,6 @@ def training_loop(model, dl_train, dl_val, dl_test, criterion, optimizer, frozen
                 'Validation/Loss': loss_val,
                 'Validation/Accuracy': accuracy,
                 'Validation/Weighted_F1': weighted_f1,
-                'Test/Loss': loss_test,
-                'Test/Accuracy': accuracy_test,
-                'Test/Weighted_F1': weighted_f1_test,
             })
 
         # Early stopping
