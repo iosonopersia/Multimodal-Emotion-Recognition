@@ -19,7 +19,8 @@ class Dataset(torch.utils.data.Dataset):
         self.MAX_AUDIO_LENGTH = config.AUDIO.max_duration # seconds
         self.len_triplet_picking = config.solver.len_triplet_picking
         self.mode = mode
-        # add augmentation to images
+
+        # add audio augmentation
         self.audio_transforms = audiomentations.Compose([
             AddGaussianSNR(min_snr_in_db=5, max_snr_in_db=40.0, p=0.5),
             TimeStretch(min_rate=0.8, max_rate=1.25, p=0.5),
@@ -50,6 +51,7 @@ class Dataset(torch.utils.data.Dataset):
         os.makedirs(self.mel_spectrogram_cache, exist_ok=True)
 
         self.text = get_text(mode)
+        # ONLY FOR DEBUGGING
         if self.config.DEBUG.enabled == True:
             self.text = self.text.iloc[0:self.config.DEBUG.num_samples]
 
@@ -133,7 +135,6 @@ class Dataset(torch.utils.data.Dataset):
             cache_path = os.path.basename(audio_path)
             cache_path = cache_path.split(".")[0]
             cache_path = os.path.join(self.augmentation_cache, f"{cache_path}_{augment}.png")
-
 
         sr = self.config.AUDIO.ffmpeg_sr
 
@@ -352,7 +353,6 @@ class Dataset(torch.utils.data.Dataset):
 
         # BATCH
         losses = torch.tensor( [distance_matrix[index,p] - distance_matrix[index, n] for index,(p,n) in enumerate(zip(positive_index, negative_index))])
-        # put to 0 the value if [distance_matrix[index,p] - distance_matrix[index, n] is negative
 
         # take the batch_size biggest losses
         _, indices = torch.topk(losses, batch_size, sorted=False)
@@ -397,7 +397,7 @@ class Dataset(torch.utils.data.Dataset):
         i_emotions = torch.tensor([utterance["Emotion"].iloc[0] for utterance in utterances])
         j_emotions = i_emotions.unsqueeze(-1)
         positive_mask = torch.where(i_emotions != j_emotions, torch.tensor(0.0), positive_mask)
-        positive_mask.diagonal()[:] = 0.0 # The negative cannot coincide with the anchor
+        positive_mask.diagonal()[:] = 0.0 # The positive cannot coincide with the anchor
 
         return positive_mask
 
