@@ -10,10 +10,8 @@ class AudioERC(torch.nn.Module):
 
         hidden_size = WAV2VEC2._params['encoder_embed_dim']
         self.classifier_head = torch.nn.Sequential(
-            # torch.nn.Dropout(0.4),
             torch.nn.Linear(hidden_size, hidden_size),
             torch.nn.Tanh(), # TODO: Try ReLU
-            # torch.nn.Dropout(0.4),
             torch.nn.Linear(hidden_size, num_classes),
         )
 
