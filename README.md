@@ -9,40 +9,40 @@ The project is structured as follows:
 ```bash
 ├───checkpoints # Model checkpoints
 │   ├───audio_mel # Feature extractor audio_mel model
-│	├───audio_wav2vec2 # Feature extractor audio_wav2vec2 model
-│	├───text # Feature extractor text model (roberta-base and roberta-large)
-│	└───m2fnet # M2FNet model
+│   ├───audio_wav2vec2 # Feature extractor audio_wav2vec2 model
+│   ├───text # Feature extractor text model (roberta-base and roberta-large)
+│   └───m2fnet # M2FNet model
 ├───data
 │   └───MELD.Raw
 │       ├───dev_splits_complete # Validation set
 │       │   ├───mel_spectrograms
 │       │   └───wav
 │       ├───output_repeated_splits_test # Test set
-│		│	├───mel_spectrograms
+│       │   ├───mel_spectrograms
 │       │   └───wav
 │       └───train_splits # Training set
 │           ├───mel_spectrograms
 │           └───wav
 ├───embeddings # Embeddings coming from the feature extractor models
-│	├───audio_mel # audio: original
-│	├───audio_wav2vec2 # audio: Wav2Vec2.0
+│   ├───audio_mel # audio: original
+│   ├───audio_wav2vec2 # audio: Wav2Vec2.0
 │   ├───text_base # text: roberta-base
 │   └───text_large # text: roberta-large
 ├───paper # paper references
 ├───scripts # bash scripts for dataset download, audio extraction and venv creation
 └───src
     └───feature_extractors # Feature extractors models and training scripts
-		├───audio_mel
-		│   └───losses # Adaptive triplet based loss function
-		├───audio_wav2vec2
-		└───text
+        ├───audio_mel
+        │   └───losses # Adaptive triplet based loss function
+        ├───audio_wav2vec2
+        └───text
 	# M2FNet model and training scripts
-	config.yaml
-	dataset.py
-	model.py
-	test.py
-	train.py
-	utils.py
+    config.yaml
+    dataset.py
+    model.py
+    test.py
+    train.py
+    utils.py
 ```
 
 In every subfolder of `src` there is a `config.yaml` file that contains the configurations of the corresponding model.
