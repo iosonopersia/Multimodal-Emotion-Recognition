@@ -64,6 +64,7 @@ def main(config=None):
 
     #============WANDB==============
     if config.wandb.enabled:
+        entity_name = config.wandb.entity
         resume_run = config.wandb.resume_run
         resume_run_id = config.wandb.resume_run_id
         os_start_method = 'spawn' if os.name == 'nt' else 'fork'
@@ -73,6 +74,7 @@ def main(config=None):
             name=run_datetime,
             config=config,
             settings=wandb.Settings(start_method=os_start_method),
+            entity = entity_name,
             resume="must" if resume_run else False,
             id=resume_run_id)
 

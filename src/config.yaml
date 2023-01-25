@@ -78,6 +78,7 @@ wandb:
     enabled: False
     watch_model: False
     project_name: multimodal-emotion-recognition
+    entity: "" # user or team name
     resume_run: False
     resume_run_id: "" # wandb run id to resume
 

@@ -63,6 +63,7 @@ wandb:
     enabled: False
     watch_model: False
     project_name: audio-mel-embeddings
+    entity: "" # user or team name
     resume_run: False
     resume_run_id: "" # wandb run id to resume
 
