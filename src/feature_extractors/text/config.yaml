@@ -44,5 +44,7 @@ wandb:
     enabled: True
     watch_model: False
     project_name: text-feature-extractor
+    resume_run: False
+    resume_run_id: "" # wandb run id to resume
 
 ...

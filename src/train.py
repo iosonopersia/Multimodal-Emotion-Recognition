@@ -57,13 +57,17 @@ def main(config=None):
 
     #============WRITER==============
     if config.wandb.enabled:
+        resume_run = config.wandb.resume_run
+        resume_run_id = config.wandb.resume_run_id
         os_start_method = 'spawn' if os.name == 'nt' else 'fork'
         run_datetime = datetime.now().isoformat().split('.')[0]
         wandb.init(
             project=config.wandb.project_name,
             name=run_datetime,
             config=config,
-            settings=wandb.Settings(start_method=os_start_method))
+            settings=wandb.Settings(start_method=os_start_method),
+            resume="must" if resume_run else False,
+            id=resume_run_id)
 
     #============SCHEDULER===============
     #------------------------------------

@@ -45,5 +45,7 @@ wandb:
     enabled: True
     watch_model: False
     project_name: audio_wav2vec2-feature-extractor
+    resume_run: False
+    resume_run_id: "" # wandb run id to resume
 
 ...
